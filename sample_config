@@ -1,0 +1,111 @@
+# This file contains all configurable parameters for the testing script, their
+# defaults, and in some cases additional examples.
+
+
+# Set to anything to enable script debugging
+DEBUG=''
+
+# CRC version to use.  Latest supported version is 1.17.0, which corresponds to
+# OpenShift 4.5
+CRC_VERSION='1.17.0'
+
+# Location where we want to untar and keep the crc binary after untaring it
+CRC_DIR=~/crc-linux
+
+# Directory where deployment and test manifest directories are
+MANIFEST_DIR="${SCRIPT_DIR}/manifests"
+
+# Directory to store test running artifacts such as logs and the cluster
+# access configuration
+ARTIFACTS_DIR="${SCRIPT_DIR}/test-artifacts"
+
+# OpenShift pull secret.
+# You can download and use your own secret from
+# https://cloud.redhat.com/openshift/install/crc/installer-provisioned
+# If configured secret file doesn't exist, a fake one will be created.
+SECRET_FILE="${CRC_DIR}/pull-secret"
+
+# Manifest with the storage array's configuration options.
+# We can do this step manually by running the script up to the container, then
+# using the web console to deploy the driver using the form (make sure to name
+# it "backend"), and then running the e2e tests or just extract the
+# configuration options used by the form.
+DRIVER_FILE='lvmdriver.yaml'
+
+# Catalog entry to use. Valid values are community-operators and
+# external-operators
+CATALOG=community-operators
+
+# A template used to build the string with the container that has the e2e tests
+E2E_CONTAINER_TEMPLATE='embercsi/openshift-tests:${OPENSHIFT_VERSION}'
+
+# DRIVER_SOURCE
+#   Assume it's from source code if a directory exists with this name,
+#   otherwise it should be a container: [registry/][project/]container[:tag]
+#   Examples:
+#     DRIVER_SOURCE=/home/geguileo/code/ember-csi
+#     DRIVER_SOURCE=quay.io/embercsi/ember-csi:latest
+#
+# DRIVER_DOCKERFILE
+#   When DRIVER_SOURCE is a directory with the source code, here we have the
+#   Dockerfile location relative to the DRIVER_SOURCE directory.
+#   Defaults to Dockerfile
+#
+# DRIVER_REGISTRY
+#   URL of the registry we want to impersonate. For example: docker.io
+#
+# DRIVER_CONTAINER
+#   Container we want to impersonate, in the form of project/container[:tag]
+
+# OPERATOR_SOURCE
+#   Assume it's from source code if a directory exists with this name,
+#   otherwise it should be a container: [registry/][project/]container[:tag]
+#   Examples:
+#     DRIVER_SOURCE=/home/geguileo/code/ember-csi-operator
+#     DRIVER_SOURCE=quay.io/embercsi/ember-csi-operator:latest
+#
+# OPERATOR_DOCKERFILE
+#   When OPERATOR_SOURCE is a directory with the source code, here we have the
+#   Dockerfile location relative to the OPERATOR_SOURCE directory.
+#   Defaults to build/Dockerfile.multistage
+#
+# OPERATOR_REGISTRY
+#   URL of the registry we want to impersonate. For example: docker.io
+#
+# OPERATOR_CONTAINER
+#   Container we want to impersonate, in the form of project/container[:tag]
+
+# EXAMPLES OF USING DIFFERENT CONTAINERS
+#==============================================================================
+# Custom Ember-CSI driver image from prepository with upstream operator
+
+# # Upstream operator with downstream driver
+# DRIVER_REGISTRY=
+# DRIVER_CONTAINER='embercsi/ember-csi:master'
+# DRIVER_SOURCE='my-registry.com/my-project/ember-csi-ember-csi-driver:latest'
+
+#==============================================================================
+# Custom Ember-CSI driver and operator images from repository
+
+# Using the upstream catalog, so we need to impersonate the operator from
+# docker.io with the container we want.
+# OPERATOR_REGISTRY='docker.io'
+# OPERATOR_CONTAINER='embercsi/ember-csi-operator:latest'
+# OPERATOR_SOURCE='my-registry.com/my-project/ember-csi-ember-csi-operator:latest'
+
+# DRIVER_REGISTRY='my-registry.com'
+# DRIVER_CONTAINER='my-project/ember-csi:master'
+# DRIVER_SOURCE='my-registry.com/my-project/ember-csi-ember-csi-driver:latest'
+
+#==============================================================================
+# Custom operator and driver images built from source code
+
+# OPERATOR_REGISTRY='docker.io'
+# OPERATOR_CONTAINER='embercsi/ember-csi-operator:latest'
+# OPERATOR_SOURCE='/home/vagrant/ember-csi-operator'
+# OPERATOR_DOCKERFILE='build/Dockerfile.multistage'
+
+# DRIVER_REGISTRY=
+# DRIVER_CONTAINER='embercsi/ember-csi:master'
+# DRIVER_SOURCE='/home/vagrant/ember'
+# DRIVER_DOCKERFILE='Dockerfile8'

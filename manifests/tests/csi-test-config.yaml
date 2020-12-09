@@ -1,0 +1,28 @@
+ShortName: ember
+StorageClass:
+  FromFile: test-sc.yaml
+SnapshotClass:
+  FromName: true
+DriverInfo:
+  Name: backend.ember-csi.io
+  SupportedSizeRange:
+    Min: 1Gi
+    Max: 5Gi
+  SupportedFsType:
+    xfs: {}
+    ext4: {}
+  Capabilities:
+    persistence: true
+    fsGroup: true
+    block: true
+    exec: true
+    # pvcDataSource: false
+    # snapshotDataSource: false
+    pvcDataSource: true
+    snapshotDataSource: true
+    volumeLimits: false
+    RWX: true
+    multipods: false
+    topology: false
+    controllerExpansion: true
+    nodeExpansion: true

@@ -1,0 +1,105 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: embercsi
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: "true"
+  #creationTimestamp: "2020-10-01T10:38:48Z"
+  #managedFields:
+  #- apiVersion: rbac.authorization.k8s.io/v1
+    #fieldsType: FieldsV1
+    #fieldsV1:
+      #f:metadata:
+        #f:annotations:
+          #.: {}
+          #f:rbac.authorization.kubernetes.io/autoupdate: {}
+      #f:rules: {}
+    #manager: openshift-apiserver
+    #operation: Update
+    #time: "2020-10-01T10:38:48Z"
+  name: shared-resource-viewer
+  namespace: embercsi
+  # resourceVersion: "6877"
+  # selfLink: /apis/rbac.authorization.k8s.io/v1/namespaces/openshift/roles/shared-resource-viewer
+  # uid: 7feaba3b-a2c5-47ce-aa38-45a4995c68e3
+rules:
+- apiGroups:
+  - ""
+  - template.openshift.io
+  resources:
+  - templates
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  - image.openshift.io
+  resources:
+  - imagestreamimages
+  - imagestreams
+  - imagestreamtags
+  - imagetags
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  - image.openshift.io
+  resources:
+  - imagestreams/layers
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: "true"
+  #creationTimestamp: "2020-10-01T10:38:48Z"
+  #managedFields:
+  #- apiVersion: rbac.authorization.k8s.io/v1
+    #fieldsType: FieldsV1
+    #fieldsV1:
+      #f:metadata:
+        #f:annotations:
+          #.: {}
+          #f:rbac.authorization.kubernetes.io/autoupdate: {}
+      #f:roleRef:
+        #f:apiGroup: {}
+        #f:kind: {}
+        #f:name: {}
+      #f:subjects: {}
+    #manager: openshift-apiserver
+    #operation: Update
+    #time: "2020-10-01T10:38:48Z"
+  name: shared-resource-viewers
+  namespace: embercsi
+  #resourceVersion: "6882"
+  #selfLink: /apis/rbac.authorization.k8s.io/v1/namespaces/openshift/rolebindings/shared-resource-viewers
+  #uid: 285ac12a-fab2-43c7-b200-f5eb105f995e
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: shared-resource-viewer
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:authenticated
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:authenticated:oauth
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:unauthenticated

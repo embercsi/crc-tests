@@ -1,0 +1,10 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: backend.ember-csi.io-sc
+  namespace: default
+provisioner: backend.ember-csi.io
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+# We cannot enable volume expansion by default or "volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property" test will fail
+# allowVolumeExpansion: true

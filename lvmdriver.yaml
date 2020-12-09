@@ -1,0 +1,15 @@
+apiVersion: ember-csi.io/v1alpha1
+kind: EmberStorageBackend
+metadata:
+  name: backend
+spec:
+  config:
+    envVars:
+      X_CSI_EMBER_CONFIG:
+        debug: true
+        plugin_name: backend
+      X_CSI_BACKEND_CONFIG:
+        driver: LVMVolume
+        target_helper: lioadm
+        volume_group: ember-volumes
+        name: backend

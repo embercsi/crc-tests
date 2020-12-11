@@ -114,7 +114,7 @@ CRC_URL=https://mirror.openshift.com/pub/openshift-v4/clients/crc/${CRC_VERSION}
 CRC_TEMP_FILE="${ARTIFACTS_DIR}/crc.tar.xz"
 CRC="${CRC_DIR}/crc"
 
-CLEAN_OPTIONS='tar crc vm artifacts operator driver registries e2e'
+CLEAN_OPTIONS='tar vm crc artifacts operator driver registries e2e'
 DEFAULT_CLEAN_OPTIONS=('tar vm artifacts operator driver')
 
 

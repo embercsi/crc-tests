@@ -75,7 +75,6 @@ ARTIFACTS_DIR="${SCRIPT_DIR}/test-artifacts"
 INTERNAL_REGISTRY_URL='image-registry.openshift-image-registry.svc:5000'
 
 CRC_VERSION='1.17.0'
-CRC_URL=https://mirror.openshift.com/pub/openshift-v4/clients/crc/${CRC_VERSION}/crc-linux-amd64.tar.xz
 CRC_DIR=~/crc-linux
 SECRET_FILE="${CRC_DIR}/pull-secret"
 
@@ -111,6 +110,7 @@ fi
 
 exec &> >(tee -a "${ARTIFACTS_DIR}/execution.log")
 
+CRC_URL=https://mirror.openshift.com/pub/openshift-v4/clients/crc/${CRC_VERSION}/crc-linux-amd64.tar.xz
 CRC_TEMP_FILE="${ARTIFACTS_DIR}/crc.tar.xz"
 CRC="${CRC_DIR}/crc"
 

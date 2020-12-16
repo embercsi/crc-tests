@@ -114,8 +114,8 @@ CRC_URL=https://mirror.openshift.com/pub/openshift-v4/clients/crc/${CRC_VERSION}
 CRC_TEMP_FILE="${ARTIFACTS_DIR}/crc.tar.xz"
 CRC="${CRC_DIR}/crc"
 
-CLEAN_OPTIONS='tar vm crc artifacts operator driver registries e2e'
-DEFAULT_CLEAN_OPTIONS=('tar vm artifacts operator driver')
+CLEAN_OPTIONS='tar vm crc artifacts operator operator-container driver container registries e2e'
+DEFAULT_CLEAN_OPTIONS=('tar vm artifacts operator-container container')
 
 
 if [[ -n $DEBUG ]]; then
@@ -591,12 +591,17 @@ function clean_crc {
       artifacts)
         rm -f "${ARTIFACTS_DIR}"/*
         ;;
+      container)
+        clean_container "$DRIVER_SOURCE" "$DRIVER_REGISTRY" "$DRIVER_CONTAINER"
+        ;;
       driver)
         if crc_status; then
           login
           oc delete -f "${DRIVER_FILE}" || true
         fi
-        clean_container "$DRIVER_SOURCE" "$DRIVER_REGISTRY" "$DRIVER_CONTAINER"
+        ;;
+      operator-container)
+        clean_container "$OPERATOR_SOURCE" "$OPERATOR_REGISTRY" "$OPERATOR_CONTAINER"
         ;;
       operator)
         if crc_status; then
@@ -615,7 +620,6 @@ function clean_crc {
             oc delete -f "${manifests}/catalog.yaml" || true
           fi
         fi
-        clean_container "$OPERATOR_SOURCE" "$OPERATOR_REGISTRY" "$OPERATOR_CONTAINER"
         ;;
       registries)
         if crc_status; then

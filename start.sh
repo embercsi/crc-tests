@@ -472,7 +472,7 @@ function run_e2e_tests {
   if ! sudo podman image exists ${E2E_CONTAINER}; then
     if ! sudo podman pull "${E2E_CONTAINER}"; then
       echo "Could not pull container ${E2E_CONTAINER}, building it"
-      (cd "${SCRIPT_DIR}/e2e-container" && ./build.sh $OPENSHIFT_VERSION)
+      (cd "${SCRIPT_DIR}/e2e-container" && sudo ./build.sh $OPENSHIFT_VERSION)
     fi
   fi
 
@@ -486,7 +486,7 @@ function run_e2e_tests {
           -e KUBECONFIG=/artifacts/kubeconfig.yaml \
           -e TEST_CSI_DRIVER_FILES=/home/vagrant/csi-test-config.yaml \
           -u root \
-          embercsi/openshift-tests:4.5 2>&1 | tee "${ARTIFACTS_DIR}/test-run.log"
+          ${E2E_CONTAINER} 2>&1 | tee "${ARTIFACTS_DIR}/test-run.log"
   result=$?
   set -e
 
@@ -625,7 +625,7 @@ function clean_crc {
         fi
         ;;
       e2e)
-        E2E_CONTAINER="embercsi/openshift-tests:${OPENSHIFT_VERSION}"
+        eval E2E_CONTAINER="${E2E_CONTAINER_TEMPLATE}"
         sudo podman rmi ${E2E_CONTAINER} || true
         ;;
       *)

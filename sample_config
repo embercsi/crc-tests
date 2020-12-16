@@ -5,9 +5,9 @@
 # Set to anything to enable script debugging
 DEBUG=''
 
-# CRC version to use.  Latest supported version is 1.17.0, which corresponds to
-# OpenShift 4.5
-CRC_VERSION='1.17.0'
+# CRC version to use.  Latest supported version is 1.20.0, which corresponds to
+# OpenShift 4.6.6
+CRC_VERSION='1.20.0'
 
 # Location where we want to untar and keep the crc binary after untaring it
 CRC_DIR=~/crc-linux

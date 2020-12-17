@@ -334,7 +334,7 @@ function upload_impersonate {
   if [[ -z $registry ]]; then
     # Make sure the internal registry is queried first for unqualified images
     # if it's not already there.
-    if ! ssh $SSH_PARAMS $SSH_REMOTE "cat /etc/containers/registries.conf | grep '[\'${INTERNAL_REGISTRY_URL}'"; then
+    if ! ssh $SSH_PARAMS $SSH_REMOTE "grep \"\['${INTERNAL_REGISTRY_URL}\" /etc/containers/registries.conf"; then
       echo "Setting the CRC VM to use the internal registry for unqualified images with the highest priority"
       ssh $SSH_PARAMS $SSH_REMOTE "sudo sed -i \"s/unqualified-search-registries = \[/unqualified-search-registries = \['${INTERNAL_REGISTRY_URL}',/\" /etc/containers/registries.conf && sudo systemctl restart crio kubelet"
       do_reset='yes'
@@ -343,7 +343,7 @@ function upload_impersonate {
   # For qualified images add a possible mirror for the registry we are
   # impersonating but allow going back to the original location if we don't
   # have a replacement.  Only add it if it's not already there.
-  elif ! ssh $SSH_PARAMS $SSH_REMOTE "cat /etc/containers/registries.conf | grep \"prefix = '${registry}'\""; then
+  elif ! ssh $SSH_PARAMS $SSH_REMOTE "grep \"prefix = '${registry}'\" /etc/containers/registries.conf"; then
     ssh $SSH_PARAMS $SSH_REMOTE "echo -e \"\n[[registry]]\nprefix = '$registry'\nblocked = false\ninsecure = true\nlocation = '$registry'\n[[registry.mirror]]\nlocation = 'image-registry.openshift-image-registry.svc:5000'\" | sudo tee -a /etc/containers/registries.conf"
     do_reset='yes'
   fi

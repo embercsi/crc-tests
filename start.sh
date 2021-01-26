@@ -486,7 +486,7 @@ function run_e2e_tests {
   fi
 
   set +e
-  sudo podman run --rm -t --network=host \
+  sudo podman run --rm -t --name=e2e --network=host \
           -v "${ARTIFACTS_DIR}":/artifacts \
           -v "${ARTIFACTS_DIR}/oc":/bin/oc \
           -v "${ARTIFACTS_DIR}/oc":/bin/kubectl \

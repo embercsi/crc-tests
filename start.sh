@@ -244,10 +244,13 @@ function run_crc {
   # works if we are not using fake credentials, but since could be running with
   # fake credentials, we better use a custom manifest to deploy it.
   #
-  # ID=`oc get clusterversion version -ojsonpath='{range .spec.overrides[*]}{.name}{"\n"}{end}' | nl -v 0 -w 1 | grep csi-snapshot-controller-operator | cut -f 1`
-  # oc patch clusterversion/version --type='json' -p '[{"op":"remove", "path":"/spec/overrides/'${ID}'"}]'
-
-  sed -e "s/latest/${OPENSHIFT_VERSION}/g" "$MANIFEST_DIR/deployment/csi-snapshot-controller.yaml" | oc apply -f -
+  if grep -q fake "${SECRET_FILE}"; then
+    sed -e "s/latest/${OPENSHIFT_VERSION}/g" "$MANIFEST_DIR/deployment/csi-snapshot-controller.yaml" | oc apply -f -
+  else
+    if ID=`oc get clusterversion version -ojsonpath='{range .spec.overrides[*]}{.name}{"\n"}{end}' | nl -v 0 -w 1 | grep csi-snapshot-controller-operator | cut -f 1`; then
+      oc patch clusterversion/version --type='json' -p '[{"op":"remove", "path":"/spec/overrides/'${ID}'"}]'
+    fi
+  fi
 
   echo -n "Waiting for the snapshot operator to be running ..."
   while true; do

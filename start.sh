@@ -218,6 +218,24 @@ function setup_crc {
 }
 
 
+function increase_timeout_marketplace {
+  operator=$1
+  if [[ "${CRC_VERSION}" == '1.20.0' ]]; then
+    return
+  fi
+
+  echo "Increasing probe timeout for the ${operator} marketplace operator"
+  while ! oc get -n openshift-marketplace deployment.apps/${operator}-operators ; do
+    sleep 5
+  done
+
+  # Sometimes marketplace operators probes keep failing, so we increase their
+  # timeouts, as per https://access.redhat.com/solutions/5388381
+  patch_json="{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"${operator}-operators\", \"livenessProbe\": {\"initialDelaySeconds\": 60}, \"readinessProbe\": {\"initialDelaySeconds\": 120}}]}}}}"
+  oc patch deployment.apps/${operator}-operators -n openshift-marketplace --patch "$patch_json"
+}
+
+
 # Start CRC to get the OpenShift cluster
 function run_crc {
   do_wait="$1"
@@ -238,6 +256,9 @@ function run_crc {
     "${CRC}" start -p "${SECRET_FILE}"
 
     login
+
+    increase_timeout_marketplace 'certified'
+    increase_timeout_marketplace 'community'
 
     if [[ -n "${do_wait}" ]]; then
       echo "Giving time for the cluster to stabilize (2 min sleep)"

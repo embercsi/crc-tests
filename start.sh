@@ -218,8 +218,8 @@ function run_crc {
 
   if "${CRC}" status; then
     if [[ `"${CRC}" status | grep Running | wc -l` != '2' ]]; then
-      "${CRC}" delete -f
-      start_crc=1
+      echo -e "Existing deployment is not running as expected, please check it manually with:\n\t\"${CRC}\" status"
+      exit 3
     fi
   else
     start_crc=1

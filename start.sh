@@ -74,7 +74,6 @@ ARTIFACTS_DIR="${SCRIPT_DIR}/test-artifacts"
 # NOTE: Won't work if we don't include the port
 INTERNAL_REGISTRY_URL='image-registry.openshift-image-registry.svc:5000'
 
-CRC_VERSION='1.17.0'
 CRC_DIR=~/crc-linux
 SECRET_FILE="${CRC_DIR}/pull-secret"
 
@@ -90,8 +89,7 @@ OPERATOR_CONTAINER='embercsi/ember-csi-operator:latest'
 OPERATOR_DOCKERFILE='build/Dockerfile.multistage'
 OPERATOR_SOURCE=
 
-E2E_CONTAINER_TEMPLATE='embercsi/openshift-tests:${OPENSHIFT_VERSION}'
-
+OPENSHIFT_VERSION='4.6'
 
 if [[ -z "${CONFIG}" ]]; then
   echo 'No config file defined in command line'
@@ -109,6 +107,18 @@ else
 fi
 
 exec &> >(tee -a "${ARTIFACTS_DIR}/execution.log")
+
+if [[ "${OPENSHIFT_VERSION}" == '4.6' ]]; then
+  CRC_VERSION='1.20.0'
+elif [[ "${OPENSHIFT_VERSION}" == '4.5' ]]; then
+  CRC_VERSION='1.17.0'
+else
+  echo "Unknown OPENSHIFT_VERSION: ${OPENSHIFT_VERSION}"
+  exit 4
+fi
+
+
+E2E_CONTAINER="embercsi/openshift-tests:${OPENSHIFT_VERSION}"
 
 CRC_URL=https://mirror.openshift.com/pub/openshift-v4/clients/crc/${CRC_VERSION}/crc-linux-amd64.tar.xz
 CRC_TEMP_FILE="${ARTIFACTS_DIR}/crc.tar.xz"
@@ -183,7 +193,6 @@ function setup_crc {
     echo '{"auths":{"fake":{"auth": "bar"}}}' > "${SECRET_FILE}"
   fi
 
-  OPENSHIFT_VERSION=`${CRC} version -o json |python -c "import sys, json; print('.'.join(json.load(sys.stdin)['openshiftVersion'].split('.')[:2]))"`
   echo "CRC version ${CRC_VERSION} with OpenShift ${OPENSHIFT_VERSION}"
 
   echo "Setting up CRC requirements"
@@ -479,8 +488,6 @@ function run_e2e_tests {
   # container.
   oc_path=`realpath "${OC_PATH}"`
 
-  eval E2E_CONTAINER="${E2E_CONTAINER_TEMPLATE}"
-
   if ! sudo podman image exists ${E2E_CONTAINER}; then
     if ! sudo podman pull "${E2E_CONTAINER}"; then
       echo "Could not pull container ${E2E_CONTAINER}, building it"
@@ -641,7 +648,6 @@ function clean_crc {
         fi
         ;;
       e2e)
-        eval E2E_CONTAINER="${E2E_CONTAINER_TEMPLATE}"
         sudo podman rmi ${E2E_CONTAINER} || true
         ;;
       *)

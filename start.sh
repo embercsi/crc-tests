@@ -500,20 +500,19 @@ function run_e2e_tests {
   set -e
 
   # Save controller and node logs
-  if [[ ! $result ]]; then
-    pods=`oc get -l app=embercsi -o go-template='{{range .items}}{{.metadata.name}}{{" "}}{{end}}' pod`
-    for pod in $pods; do
-      containers=`oc get pods ${pod} -o jsonpath='{.spec.containers[*].name}'`
-      for container in $containers; do
-        oc logs $pod -c $container > "${ARTIFACTS_DIR}/${pod}-${container}.log"
-      done
+  pods=`oc get -l app=embercsi -o go-template='{{range .items}}{{.metadata.name}}{{" "}}{{end}}' pod`
+  for pod in $pods; do
+    containers=`oc get pods ${pod} -o jsonpath='{.spec.containers[*].name}'`
+    for container in $containers; do
+      oc logs $pod -c $container > "${ARTIFACTS_DIR}/${pod}-${container}.log"
     done
-
-    exit $result
-  fi
+  done
 
   # Save kubelet logs
   oc adm node-logs --role=master -u kubelet > "${ARTIFACTS_DIR}/kubelet.log"
+
+  exit $result
+
 }
 
 

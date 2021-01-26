@@ -227,6 +227,9 @@ function run_crc {
 
   if [[ -n ${start_crc} ]]; then
     "${CRC}" start -p "${SECRET_FILE}"
+
+    login
+
     if [[ -n "${do_wait}" ]]; then
       echo "Giving time for the cluster to stabilize (2 min sleep)"
       sleep 120
@@ -482,6 +485,7 @@ function run_e2e_tests {
     if ! sudo podman pull "${E2E_CONTAINER}"; then
       echo "Could not pull container ${E2E_CONTAINER}, building it"
       (cd "${SCRIPT_DIR}/e2e-container" && sudo ./build.sh $OPENSHIFT_VERSION)
+      login
     fi
   fi
 

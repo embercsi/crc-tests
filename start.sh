@@ -128,7 +128,7 @@ function login {
   echo Waiting for the cluster to be up and running
   # Wait for CRC to be up and Running
   while [[ `"${CRC}" status | grep Running | wc -l` != '2' ]]; do
-    sleep 1
+    sleep 5
   done
 
   echo "Loging in the OpenShift cluster"

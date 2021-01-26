@@ -297,12 +297,17 @@ function impersonate_container {
 
   if sudo podman inspect "${container_location}"; then
     echo "Container ${container_location} exists, skipping build/download"
-  elif [[ -e "${source_location}/${docker_file}" ]]; then
-    echo "Building container from source at ${source_location}"
+  elif [[ -d "${source_location}" ]]; then
+    if [[ ! -e "${source_location}/${docker_file}" ]]; then
+      echo "Missing ${docker_file}, cannot build container"
+      exit 2
+    fi
+
+    echo "Building container from source at ${source_location}/${docker_file}"
     sudo docker build -t "${container_location}" -f "${docker_file}" "${source_location}"
 
   else
-    echo "Pulling custom container ${source_location}"
+    echo "Source is not a directory, assuming it's a container. Pulling custom container ${source_location}"
     sudo podman pull --tls-verify=false "${source_location}"
     sudo podman tag "${source_location}" "${container_location}"
   fi

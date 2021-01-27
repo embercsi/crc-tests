@@ -278,21 +278,29 @@ function run_crc {
   # fake credentials, we better use a custom manifest to deploy it.
   #
   if grep -q fake "${SECRET_FILE}"; then
-    sed -e "s/latest/${OPENSHIFT_VERSION}/g" "$MANIFEST_DIR/deployment/csi-snapshot-controller.yaml" | oc apply -f -
+    # These manifest come from https://github.com/kubernetes-csi/external-snapshotter/tree/master/deploy/kubernetes/csi-snapshotter
+    oc apply -f "$MANIFEST_DIR/deployment/rbac-snapshot-controller.yaml"
+    sed -e "s/latest/${OPENSHIFT_VERSION}/g" "$MANIFEST_DIR/deployment/setup-snapshot-controller.yaml" | oc apply -f -
+    snap_namespace='default'
+
   else
     if ID=`oc get clusterversion version -ojsonpath='{range .spec.overrides[*]}{.name}{"\n"}{end}' | nl -v 0 -w 1 | grep csi-snapshot-controller-operator | cut -f 1`; then
       oc patch clusterversion/version --type='json' -p '[{"op":"remove", "path":"/spec/overrides/'${ID}'"}]'
     fi
+
+    snap_namespace='openshift-cluster-storage-operator'
+
+    echo -n "Waiting for the snapshot operator to be running ..."
+    while true; do
+      echo -n '.'
+      oc wait --namespace $snap_namespace --for=condition=Ready --timeout=15s -l app=csi-snapshot-controller-operator pod 2>/dev/null && break
+      sleep 5
+    done
+    echo
   fi
 
-  echo -n "Waiting for the snapshot operator to be running ..."
-  while true; do
-    echo -n '.'
-    oc wait --namespace openshift-cluster-storage-operator --for=condition=Ready --timeout=15s -l app=csi-snapshot-controller-operator pod 2>/dev/null && break
-    sleep 5
-  done
-  echo
-  while [[ -z `oc get pod --namespace openshift-cluster-storage-operator -l app=csi-snapshot-controller 2>/dev/null` ]]; do
+  echo -n "Waiting for the snapshot controller to be running ..."
+  while [[ -z `oc get pod --namespace $snap_namespace -l app=csi-snapshot-controller 2>/dev/null` ]]; do
     sleep 5
   done
 

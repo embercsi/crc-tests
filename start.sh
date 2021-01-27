@@ -89,7 +89,7 @@ OPERATOR_CONTAINER='embercsi/ember-csi-operator:latest'
 OPERATOR_DOCKERFILE='build/Dockerfile.multistage'
 OPERATOR_SOURCE=
 
-OPENSHIFT_VERSION='4.6'
+OPENSHIFT_VERSION='4.5'
 
 if [[ -z "${CONFIG}" ]]; then
   echo 'No config file defined in command line'
@@ -183,15 +183,25 @@ function get_crc {
 }
 
 
+function check_credentials {
+  if [[ ! -e "${SECRET_FILE}" ]]; then
+    echo "No secret present at ${SECRET_FILE}, writing a fake one"
+    echo '{"auths":{"fake":{"auth": "bar"}}}' > "${SECRET_FILE}"
+  fi
+
+  if [[ "${OPENSHIFT_VERSION}" != '4.5' ]] && grep -q fake "${SECRET_FILE}" ; then
+    echo "Fake credentials only work on OpenShift version 4.5"
+    exit 5
+  fi
+}
+
+
 # Setup CRC requirements, tinyproxy to access the web console remotely, and
 # podman to run the tests.
 function setup_crc {
   get_crc
 
-  if [[ ! -e "${SECRET_FILE}" ]]; then
-    echo "No secret present at ${SECRET_FILE}, writing a fake one"
-    echo '{"auths":{"fake":{"auth": "bar"}}}' > "${SECRET_FILE}"
-  fi
+  check_credentials
 
   echo "CRC version ${CRC_VERSION} with OpenShift ${OPENSHIFT_VERSION}"
 

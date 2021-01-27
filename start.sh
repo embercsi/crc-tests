@@ -75,7 +75,7 @@ ARTIFACTS_DIR="${SCRIPT_DIR}/test-artifacts"
 INTERNAL_REGISTRY_URL='image-registry.openshift-image-registry.svc:5000'
 
 CRC_DIR=~/crc-linux
-SECRET_FILE="${CRC_DIR}/pull-secret"
+SECRET_FILE='fake-secret'
 
 OC_PATH=~/.crc/bin/oc/oc
 

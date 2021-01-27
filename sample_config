@@ -22,7 +22,7 @@ ARTIFACTS_DIR="${SCRIPT_DIR}/test-artifacts"
 # You can download and use your own secret from
 # https://cloud.redhat.com/openshift/install/crc/installer-provisioned
 # If configured secret file doesn't exist, a fake one will be created.
-SECRET_FILE="${CRC_DIR}/pull-secret"
+SECRET_FILE="pull-secret"
 
 # Manifest with the storage array's configuration options.
 # We can do this step manually by running the script up to the container, then

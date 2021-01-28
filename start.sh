@@ -241,7 +241,7 @@ function increase_timeout_marketplace {
 
   # Sometimes marketplace operators probes keep failing, so we increase their
   # timeouts, as per https://access.redhat.com/solutions/5388381
-  patch_json="{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"${operator}-operators\", \"livenessProbe\": {\"initialDelaySeconds\": 60}, \"readinessProbe\": {\"initialDelaySeconds\": 120}}]}}}}"
+  patch_json="{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"${operator}-operators\", \"livenessProbe\": {\"initialDelaySeconds\": 60, \"timeoutSeconds\": 5}, \"readinessProbe\": {\"initialDelaySeconds\": 120, \"timeoutSeconds\": 5}}]}}}}"
   oc patch deployment.apps/${operator}-operators -n openshift-marketplace --patch "$patch_json"
 }
 

@@ -81,7 +81,7 @@ OC_PATH=~/.crc/bin/oc/oc
 
 DRIVER_REGISTRY=
 DRIVER_CONTAINER='embercsi/ember-csi:master'
-DRIVER_DOCKERFILE='Dockerfile8'
+DRIVER_DOCKERFILE=
 DRIVER_SOURCE=
 
 OPERATOR_REGISTRY=
@@ -437,17 +437,6 @@ function install_operator {
 
   impersonate_container "$OPERATOR_SOURCE" "$OPERATOR_REGISTRY" "$OPERATOR_CONTAINER" "${OPERATOR_DOCKERFILE}"
 
-  echo "Creating the iSCSI pod"
-  oc apply -f "$manifests/iscsi.yaml"
-
-  echo -n "Waiting for the iSCSI pod to be running ..."
-  while true; do
-    echo -n '.'
-    oc wait --for=condition=Ready --timeout=15s pod/iscsid 2>/dev/null && break
-    sleep 5
-  done
-  echo
-
   echo -n "Wait for the community marketplace operator ..."
   if [[ "${OPENSHIFT_VERSION}" == '4.5' ]]; then
     label_match='marketplace.operatorSource=community-operators'
@@ -507,6 +496,32 @@ function deploy_driver {
     sleep 5
   done
   echo
+
+  os_version=''
+  # We may get error while trying to connect, so we retry. Error:
+  #     error: unable to upgrade connection: container not found ("ember-csi")
+  while [[ -z "$os_version" ]] ; do
+    # The iSCSI container depends on the OS version being run in the driver
+    # container, so we do automatic detection.
+    # NOTE: Canno use 'uname -r' because it returns the hosts'
+    if oc exec -t backend-controller-0 -c ember-csi -- grep 'release 7' /etc/redhat-release ; then
+      os_version=7
+    elif oc exec -t backend-controller-0 -c ember-csi -- grep 'release 8' /etc/redhat-release ; then
+      os_version=8
+    fi
+  done
+
+  echo "Creating the iSCSI pod"
+  sed -e "s/latest/${os_version}/g" "${MANIFEST_DIR}/deployment/iscsi.yaml" | oc apply -f -
+
+  echo -n "Waiting for the iSCSI pod to be running ..."
+  while true; do
+    echo -n '.'
+    oc wait --for=condition=Ready --timeout=15s pod/iscsid 2>/dev/null && break
+    sleep 5
+  done
+  echo
+
 }
 
 
@@ -659,6 +674,7 @@ function clean_crc {
         if crc_status; then
           login
           oc delete -f "${DRIVER_FILE}" || true
+          oc delete pod iscsid -n default || true
         fi
         ;;
       operator-container)
@@ -668,7 +684,6 @@ function clean_crc {
         if crc_status; then
           login
           manifests="${MANIFEST_DIR}/deployment"
-          oc delete pod iscsid -n default || true
 
           if oc get subscription ember-csi-operator; then
             csv_name=`oc get subscription ember-csi-operator -o jsonpath='{.status.currentCSV}'`

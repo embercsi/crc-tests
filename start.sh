@@ -449,12 +449,16 @@ function install_operator {
   echo
 
   echo -n "Wait for the community marketplace operator ..."
-  while true; do
-    # On 4.5
-    oc wait --for=condition=Ready --timeout=5s -n openshift-marketplace -l marketplace.operatorSource=community-operators pod 2>/dev/null && break
-    # On >= 4.6
-    oc wait --for=condition=Ready --timeout=5s -n openshift-marketplace -l olm.catalogSource=community-operators pod 2>/dev/null && break
+  if [[ "${OPENSHIFT_VERSION}" == '4.5' ]]; then
+    label_match='marketplace.operatorSource=community-operators'
+  # 4.6
+  else
+    label_match='olm.catalogSource=community-operators'
+  fi
+
+  while ! oc wait --for=condition=Ready --timeout=5s -n openshift-marketplace -l $label_match pod 2>/dev/null ; do
     echo -n '.'
+    sleep 5
   done
   echo
 

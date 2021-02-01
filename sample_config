@@ -18,6 +18,9 @@ MANIFEST_DIR="${SCRIPT_DIR}/manifests"
 # access configuration
 ARTIFACTS_DIR="${SCRIPT_DIR}/test-artifacts"
 
+# Directory to store yum, dnf, pip, and wheel caches.
+CACHE_DIR="${ARTIFACTS_DIR}/caches"
+
 # OpenShift pull secret.
 # You can download and use your own secret from
 # https://cloud.redhat.com/openshift/install/crc/installer-provisioned

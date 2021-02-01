@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Simple script to help test Ember-CSI and its operator
 # Supported OS: Centos 8 and Fedora 32 or greater
+# Centos 7 is supported if we don't rebuild containers from source.  When
+# building containers from source we'll see
+#   Error: failed to mount overlay for metacopy check with "nodev,metacopy=on" options: invalid argument
+# As described in https://github.com/containers/podman/issues/8118
 #
 # If this script fails with
 #   level=info msg="Starting libvirt service"
@@ -81,6 +85,7 @@ PWD=`pwd`
 SCRIPT_DIR=$(dirname `realpath $0`)
 MANIFEST_DIR="${SCRIPT_DIR}/manifests"
 ARTIFACTS_DIR="${SCRIPT_DIR}/test-artifacts"
+CACHE_DIR="${ARTIFACTS_DIR}/caches"
 
 # NOTE: Won't work if we don't include the port
 INTERNAL_REGISTRY_URL='image-registry.openshift-image-registry.svc:5000'
@@ -376,8 +381,12 @@ function impersonate_container {
       exit 2
     fi
 
+    cache_name=`grep FROM "${source_location}/${docker_file}" | tail -n1 | cut -d' ' -f 2 | sed 's/:/_/'`
+    cache_location="${CACHE_DIR}/cache-${cache_name}"
+
     echo "Building container from source at ${source_location}/${docker_file}"
-    sudo docker build -t "${container_location}" -f "${docker_file}" "${source_location}"
+    mkdir -p "${cache_location}"
+    sudo podman build --build-arg RELEASE=master --build-arg VERSION=`date +%d.%m.%Y.dev%H%M%S%N`  -t "${container_location}" -v "${cache_location}:/var/cache:rw,shared,z" -f "${docker_file}" "${source_location}"
 
   else
     echo "Source is not a directory, assuming it's a container. Pulling custom container ${source_location}"

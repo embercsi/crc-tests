@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
 # Simple script to help test Ember-CSI and its operator
+# Supported OS: Centos 8 and Fedora 32 or greater
+#
+# If this script fails with
+#   level=info msg="Starting libvirt service"
+#   level=info msg="Will use root access: executing systemctl daemon-reload command"
+#   level=info msg="Will use root access: executing systemctl start libvirtd"
+#   Failed to start libvirt service
+# Then it's bug: https://bugzilla.redhat.com/show_bug.cgi?id=1224211
+# Can be fixed manually running (don't use sudo)
+#    systemctl daemon-reexec
+# Or updating your OS
 #
 # Logs are stored in the $ARTIFACTS_DIR that defaults to test-artifacts:
 #   - execution.log => Output from running ./start.sh
@@ -215,7 +226,18 @@ function setup_crc {
     if grep CentOS /etc/redhat-release; then
       sudo yum -y install epel-release
     fi
-    sudo yum -y install tinyproxy > /dev/null
+
+    if ! yum info tinyproxy ; then
+      # Centos 8 doesn't have the package
+      if grep CentOS /etc/redhat-release; then
+        sudo yum -y install https://download-ib01.fedoraproject.org/pub/epel/7/x86_64/Packages/t/tinyproxy-1.8.3-2.el7.x86_64.rpm
+      else
+        echo "Please manually install tinyproxy: https://pkgs.org/search/?q=tinyproxy"
+        exit 6
+      fi
+    else
+      sudo yum -y install tinyproxy > /dev/null
+    fi
     sudo sed -i 's/Allow 127.0.0.1/#Allow 127.0.0.1/g' /etc/tinyproxy/tinyproxy.conf
     sudo sed -i '0,/^ConnectPort/s//ConnectPort 6443\nConnectPort/' /etc/tinyproxy/tinyproxy.conf
     sudo systemctl enable --now tinyproxy

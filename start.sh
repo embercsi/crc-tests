@@ -567,6 +567,7 @@ function run_e2e_tests {
 
   oc_realpath=$(realpath `which oc`)
   if ! ln -f "$oc_realpath" "${ARTIFACTS_DIR}/oc"; then
+    rm -f "${ARTIFACTS_DIR}/oc"
     cp "$oc_realpath" "${ARTIFACTS_DIR}/oc"
   fi
 

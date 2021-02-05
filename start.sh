@@ -342,6 +342,9 @@ function run_crc {
   done
 
   echo -e "If you are running this on a different host/VM, you can access the web console by:\n  - Setting your browser's proxy to this host's IP and port 8888\n  - Going to https://console-openshift-console.apps-crc.testing\n  - Using below credentials (kubeadmin should be entered as kube:admin)\n`${CRC} console --credentials`\n"
+
+  # For some reason the VM's iscsid fails to start on boot
+  do_ssh 'sudo systemctl start iscsid'
 }
 
 
@@ -528,30 +531,8 @@ function deploy_driver {
   done
   echo
 
-  os_version=''
-  # We may get error while trying to connect, so we retry. Error:
-  #     error: unable to upgrade connection: container not found ("ember-csi")
-  while [[ -z "$os_version" ]] ; do
-    # The iSCSI container depends on the OS version being run in the driver
-    # container, so we do automatic detection.
-    # NOTE: Canno use 'uname -r' because it returns the hosts'
-    if oc exec -t backend-controller-0 -c ember-csi -- grep 'release 7' /etc/redhat-release ; then
-      os_version=7
-    elif oc exec -t backend-controller-0 -c ember-csi -- grep 'release 8' /etc/redhat-release ; then
-      os_version=8
-    fi
-  done
-
-  echo "Creating the iSCSI pod"
-  sed -e "s/latest/${os_version}/g" "${MANIFEST_DIR}/deployment/iscsi.yaml" | oc apply -f -
-
-  echo -n "Waiting for the iSCSI pod to be running ..."
-  while true; do
-    echo -n '.'
-    oc wait --for=condition=Ready --timeout=15s pod/iscsid 2>/dev/null && break
-    sleep 5
-  done
-  echo
+  # Create the VG if it doesn't exist yet
+  do_ssh 'sudo bash -c '\''if [[ ! -e /dev/ember-volumes ]] ; then truncate -s 10G /var/lib/containers/ember-volumes && device=`losetup --show -f /var/lib/containers/ember-volumes ` && echo -e \"device is $device\n\" && pvcreate $device && vgcreate ember-volumes $device && vgscan && sed -i "s/^\tudev_sync = 1/\tudev_sync = 0/" /etc/lvm/lvm.conf && sed -i "s/^\tudev_rules = 1/\tudev_rules = 0/" /etc/lvm/lvm.conf; fi'\'
 
 }
 
@@ -717,7 +698,6 @@ function clean_crc {
         if crc_status; then
           login
           oc delete -f "${DRIVER_FILE}" || true
-          oc delete pod iscsid -n default || true
         fi
         ;;
       operator-container)

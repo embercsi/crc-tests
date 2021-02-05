@@ -63,8 +63,8 @@ E2E_CONTAINER_TEMPLATE='embercsi/openshift-tests:${OPENSHIFT_VERSION}'
 #   Assume it's from source code if a directory exists with this name,
 #   otherwise it should be a container: [registry/][project/]container[:tag]
 #   Examples:
-#     DRIVER_SOURCE=/home/geguileo/code/ember-csi-operator
-#     DRIVER_SOURCE=quay.io/embercsi/ember-csi-operator:latest
+#     OPERATOR_SOURCE=/home/geguileo/code/ember-csi-operator
+#     OPERATOR_SOURCE=quay.io/embercsi/ember-csi-operator:latest
 #
 # OPERATOR_DOCKERFILE
 #   When OPERATOR_SOURCE is a directory with the source code, here we have the

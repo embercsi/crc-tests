@@ -605,7 +605,7 @@ function run_e2e_tests {
 # =============================================================================
 
 function show_help {
-        echo -e "\nEmber-CSI simple test tool on OpenShift:\n$1 <action> [<config-file>] [<action-options>]\n\n<action>:\n  download: downloads the CRC files\n  setup: setup CRC dependencies\n  run: starts the CRC VM running OpenShift\n  operator: installs the Ember-CSI operator from a catalog (defaults to the community)\n  container: build/download the custom driver container and upload to the cluster.\n  driver: deploys an Ember-CSI driver (defaults to lvmdriver.yaml)\n  e2e: runs end-to-end tests\n  stop: Stops the CRC VM\n  ssh: SSHs into the CRC VM for debugging purposes\n  login: Log in the OpenShift cluster\n  clean [<config-file> <what>]: Cleans different aspects of the test deployment.  Defaults to everything except the crc installation. We can limit what to clean if we provide a configuration file (it can be '') and then what we want to clean as a series of parameters. Passing \"$0 clean '' all\" is equivalent to: \"$0 '' clean $CLEAN_OPTIONS\".\n\n<config-file>: Configuration file, which defaults to "config" in the current directory (check the "sample_config" file for available options).\n\nEvery action will ensure required steps will have been completed.\nFor example, if we run the operator action it will ensure downloads, setup, and run have been completed."
+        echo -e "\nEmber-CSI simple test tool on OpenShift:\n$1 <action> [<config-file>] [<action-options>]\n\n<action>:\n  download: downloads the CRC files\n  setup: setup CRC dependencies\n  run: starts the CRC VM running OpenShift\n  operator: installs the Ember-CSI operator from a catalog (defaults to the community)\n  container: build/download the custom driver container and upload to the cluster.\n  driver: deploys an Ember-CSI driver (defaults to lvmdriver.yaml)\n  sanity: runs csi-sanity tests\n  e2e: runs end-to-end tests\n  stop: Stops the CRC VM\n  ssh: SSHs into the CRC VM for debugging purposes\n  login: Log in the OpenShift cluster\n  clean [<config-file> <what>]: Cleans different aspects of the test deployment.  Defaults to everything except the crc installation. We can limit what to clean if we provide a configuration file (it can be '') and then what we want to clean as a series of parameters. Passing \"$0 clean '' all\" is equivalent to: \"$0 '' clean $CLEAN_OPTIONS\".\n\n<config-file>: Configuration file, which defaults to "config" in the current directory (check the "sample_config" file for available options).\n\nEvery action will ensure required steps will have been completed.\nFor example, if we run the operator action it will ensure downloads, setup, and run have been completed."
 }
 
 
@@ -641,6 +641,18 @@ function do_ssh {
   ssh $SSH_PARAMS $SSH_REMOTE "$@"
 }
 
+
+# =============================================================================
+# RUN CSC FOR FUNCTIONAL TESTS
+# =============================================================================
+
+function run_sanity {
+    echo hola
+    oc exec -it backend-controller-0 -c ember-csi -- /bin/bash -c 'if [[ ! -e csi-sanity ]]; then curl -Lo csi-sanity https://github.com/embercsi/ember-csi/raw/master/tools/csi-sanity-v2.2.0 && chmod +x csi-sanity ; fi'
+
+    oc exec -it backend-controller-0 -c ember-csi -- /bin/bash -c './csi-sanity --test.v --csi.endpoint=unix:///csi-data/csi.sock --test.timeout 0 --ginkgo.v --ginkgo.progress 2>&1' | tee "${ARTIFACTS_DIR}/csi-sanity.log"
+
+}
 
 # =============================================================================
 # CLEAN
@@ -792,6 +804,10 @@ case $COMMAND in
 
   login)
     login
+    ;;
+
+  sanity)
+    run_sanity
     ;;
 
   *)

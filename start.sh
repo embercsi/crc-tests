@@ -187,11 +187,9 @@ function get_crc {
       echo "CRC file "${CRC_TEMP_FILE}" already present in the system"
     fi
 
-    if ! ls "${ARTIFACTS_DIR}"/crc-linux-* 1> /dev/null 2>&1; then
-      echo "Untaring CRC file to $CRC_DIR"
-      tar -C "${ARTIFACTS_DIR}" -xf "$CRC_TEMP_FILE"
-    fi
-    mv "${ARTIFACTS_DIR}"/crc-linux-* "${CRC_DIR}"
+    echo "Untaring CRC file to $CRC_DIR"
+    mkdir -p "${CRC_DIR}"
+    tar --strip-components=1 --extract --directory "${CRC_DIR}" --file "${CRC_TEMP_FILE}"
 
   else
     echo "CRC already present at ${CRC_DIR}"

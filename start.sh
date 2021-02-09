@@ -347,7 +347,7 @@ function run_crc {
   do_ssh 'sudo systemctl start iscsid'
 
   # Multipath doesn't have a configuration, so we need to create it
-  do_ssh 'if [[ ! -e /etc/multipath.conf ]]; then sudo mpathconf --enable --with_multipathd y --user_friendly_names n --find_multipaths y && sudo systemctl start iscsid; fi'
+  do_ssh 'if [[ ! -e /etc/multipath.conf ]]; then sudo mpathconf --enable --with_multipathd y --user_friendly_names n --find_multipaths y && sudo systemctl start multipathd; fi'
 
 }
 

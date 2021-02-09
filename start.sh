@@ -536,7 +536,7 @@ function deploy_driver {
   echo
 
   # Create the VG if it doesn't exist yet
-  do_ssh 'sudo bash -c '\''if [[ ! -e /dev/ember-volumes ]] ; then truncate -s 10G /var/lib/containers/ember-volumes && device=`losetup --show -f /var/lib/containers/ember-volumes ` && echo -e \"device is $device\n\" && pvcreate $device && vgcreate ember-volumes $device && vgscan && sed -i "s/^\tudev_sync = 1/\tudev_sync = 0/" /etc/lvm/lvm.conf && sed -i "s/^\tudev_rules = 1/\tudev_rules = 0/" /etc/lvm/lvm.conf; fi'\'
+  do_ssh 'sudo bash -c '\''if ! vgdisplay ember-volumes ; then truncate -s 10G /var/lib/containers/ember-volumes && device=`losetup --show -f /var/lib/containers/ember-volumes ` && echo -e \"device is $device\n\" && pvcreate $device && vgcreate ember-volumes $device && vgscan && sed -i "s/^\tudev_sync = 1/\tudev_sync = 0/" /etc/lvm/lvm.conf && sed -i "s/^\tudev_rules = 1/\tudev_rules = 0/" /etc/lvm/lvm.conf; fi'\'
 
 }
 

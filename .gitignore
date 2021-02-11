@@ -2,3 +2,4 @@ test-artifacts/
 pull-secret
 fake-secret
 config
+tmp/

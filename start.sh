@@ -222,6 +222,23 @@ function setup_crc {
   echo "Setting up CRC requirements"
   "${CRC}" setup
 
+  # CRC versions higher than 1.17 have higher CPU and memory requirements
+  if [[ $CRC_VERSION != '1.17.0' ]]; then
+
+    # If we have more than 6 CPUs, use 6 for the CRC VM
+    num_cpus=`grep -c processor /proc/cpuinfo`
+    if [[ $num_cpus -gt 6 ]]; then
+      echo "Increasing CRC VM CPUs to 6"
+      "${CRC}" config set cpus 6
+    fi
+    # If we have more than 14 GB of RAM, use 12 for the CRC VM
+    total_memory=`grep MemTotal /proc/meminfo | tr -s ' ' '\t'|cut -f2`
+    if [[ $total_memory -ge 14680064 ]]; then
+      echo "Increasing CRC VM RAM to 12 GB"
+      "${CRC}" config set memory 12288
+    fi
+  fi
+
   # Setup tinyproxy so we can access the web console if we are running this on
   # a remote host/VM
   if ! which tinyproxy; then

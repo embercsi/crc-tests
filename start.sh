@@ -167,7 +167,7 @@ function login {
 
   # Add parameter when running the command to prevent oc from prompting about insecure connections
   login_command="${login_command/oc login/oc login --insecure-skip-tls-verify}"
-  while ! ${login_command}; do
+  while ! ${login_command} 2>/dev/null ; do
     sleep 2
   done
 }
@@ -539,7 +539,7 @@ function install_driver_container {
 function deploy_driver {
   install_driver_container
 
-  if oc get embercsis backend; then
+  if oc get embercsis backend 2>/dev/null ; then
     echo 'Driver already present, skipping its deployment'
     return
   fi
@@ -667,7 +667,6 @@ function do_ssh {
 # =============================================================================
 
 function run_sanity {
-    echo hola
     oc exec -it backend-controller-0 -c ember-csi -- /bin/bash -c 'if [[ ! -e csi-sanity ]]; then curl -Lo csi-sanity https://github.com/embercsi/ember-csi/raw/master/tools/csi-sanity-v2.2.0 && chmod +x csi-sanity ; fi'
 
     oc exec -it backend-controller-0 -c ember-csi -- /bin/bash -c './csi-sanity --test.v --csi.endpoint=unix:///csi-data/csi.sock --test.timeout 0 --ginkgo.v --ginkgo.progress 2>&1' | tee "${ARTIFACTS_DIR}/csi-sanity.log"

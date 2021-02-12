@@ -71,6 +71,11 @@
 set -e
 set -o pipefail
 
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
 ACTION_PARAMS=("${@:3}")
 
 COMMAND=${1}
@@ -129,7 +134,7 @@ if [[ "${OPENSHIFT_VERSION}" == '4.6' ]]; then
 elif [[ "${OPENSHIFT_VERSION}" == '4.5' ]]; then
   CRC_VERSION='1.17.0'
 else
-  echo "Unknown OPENSHIFT_VERSION: ${OPENSHIFT_VERSION}"
+  echo "${RED}Unknown OPENSHIFT_VERSION: ${OPENSHIFT_VERSION}${NC}"
   exit 4
 fi
 
@@ -204,7 +209,7 @@ function check_credentials {
   fi
 
   if [[ "${OPENSHIFT_VERSION}" != '4.5' ]] && grep -q fake "${SECRET_FILE}" ; then
-    echo "Fake credentials only work on OpenShift version 4.5"
+    echo "${RED}Fake credentials only work on OpenShift version 4.5${NC}"
     exit 5
   fi
 }
@@ -252,7 +257,7 @@ function setup_crc {
       if grep CentOS /etc/redhat-release; then
         sudo yum -y install https://download-ib01.fedoraproject.org/pub/epel/7/x86_64/Packages/t/tinyproxy-1.8.3-2.el7.x86_64.rpm
       else
-        echo "Please manually install tinyproxy: https://pkgs.org/search/?q=tinyproxy"
+        echo "${RED}Please manually install tinyproxy: https://pkgs.org/search/?q=tinyproxy${NC}"
         exit 6
       fi
     else
@@ -297,7 +302,7 @@ function run_crc {
 
   if "${CRC}" status; then
     if [[ `"${CRC}" status | grep Running | wc -l` != '2' ]]; then
-      echo -e "Existing deployment is not running as expected, please check it manually with:\n\t\"${CRC}\" status"
+      echo -e "${RED}Existing deployment is not running as expected, please check it manually with:\n\t\"${CRC}\" status${NC}"
       exit 3
     fi
   else
@@ -356,8 +361,6 @@ function run_crc {
     sleep 5
   done
 
-  echo -e "If you are running this on a different host/VM, you can access the web console by:\n  - Setting your browser's proxy to this host's IP and port 8888\n  - Going to https://console-openshift-console.apps-crc.testing\n  - Using below credentials (kubeadmin should be entered as kube:admin)\n`${CRC} console --credentials`\n"
-
   # For some reason the VM's iscsid fails to start on boot on CRC 1.17
   # CRC 1.20 doesn't have the initiatorname in the system
   do_ssh 'if [[ ! -e /etc/iscsi/initiatorname.iscsi ]]; then echo InitiatorName=`iscsi-iname` | sudo tee /etc/iscsi/initiatorname.iscsi; fi'
@@ -366,6 +369,10 @@ function run_crc {
 
   # Multipath doesn't have a configuration, so we need to create it
   do_ssh 'if [[ ! -e /etc/multipath.conf ]]; then sudo mpathconf --enable --with_multipathd y --user_friendly_names n --find_multipaths y && sudo systemctl start multipathd; fi'
+
+  echo -e "\n\n${YELLOW}If you are running this on a different host/VM, you can access the web console by:\n  - Setting your browser's proxy to this host's IP and port 8888\n  - Going to https://console-openshift-console.apps-crc.testing\n  - Using below credentials (kubeadmin should be entered as kube:admin)\n`${CRC} console --credentials`${NC}\n"
+
+  echo -e "\n${YELLOW}To access the cluster from the command line you can run:\n  \$ eval \`${CRC} oc-env\`\n  \$ $0 login${NC}\n"
 
 }
 
@@ -402,7 +409,7 @@ function impersonate_container {
     echo "Container ${container_location} exists, skipping build/download"
   elif [[ -d "${source_location}" ]]; then
     if [[ ! -e "${source_location}/${docker_file}" ]]; then
-      echo "Missing ${docker_file}, cannot build container"
+      echo "${RED}Missing ${docker_file}, cannot build container${NC}"
       exit 2
     fi
 
@@ -834,3 +841,4 @@ case $COMMAND in
     show_help $0
     exit 1
 esac
+echo -e "\n\n${GREEN}Operation completed successfully${NC}\n"

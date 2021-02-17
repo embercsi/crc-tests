@@ -61,6 +61,10 @@
 #   - See the environmental variable in use:
 #       oc exec -t backend-controller-0 -c ember-csi -- /bin/bash -c 'echo $X_CSI_BACKEND_CONFIG'
 #
+# We can confirm that we are using the right images by checking the hosts images:
+#   $ sudo podman image ls --no-trunc ember-csi-operator:latest
+# Then going into the CRC VM and doing the same thing (IMAGE ID should match)
+#   $ ./start.sh ssh config sudo podman image ls --no-trunc ember-csi-operator:latest
 #
 # TODO: Allow building and testing a custom catalog:
 #   - How to build a catalog:
@@ -100,12 +104,12 @@ SECRET_FILE='fake-secret'
 
 OC_PATH=~/.crc/bin/oc/oc
 
-DRIVER_REGISTRY=
+DRIVER_REGISTRY='docker.io'
 DRIVER_CONTAINER='embercsi/ember-csi:master'
 DRIVER_DOCKERFILE=
 DRIVER_SOURCE=
 
-OPERATOR_REGISTRY=
+OPERATOR_REGISTRY='docker.io'
 OPERATOR_CONTAINER='embercsi/ember-csi-operator:latest'
 OPERATOR_DOCKERFILE='build/Dockerfile.multistage'
 OPERATOR_SOURCE=

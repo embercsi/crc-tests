@@ -635,7 +635,7 @@ function run_e2e_tests {
 # =============================================================================
 
 function show_help {
-        echo -e "\nEmber-CSI simple test tool on OpenShift:\n$1 <action> [<config-file>] [<action-options>]\n\n<action>:\n  download: downloads the CRC files\n  setup: setup CRC dependencies\n  run: starts the CRC VM running OpenShift\n  operator: installs the Ember-CSI operator from a catalog (defaults to the community)\n  container: build/download the custom driver container and upload to the cluster.\n  driver: deploys an Ember-CSI driver (defaults to lvmdriver.yaml)\n  sanity: runs csi-sanity tests\n  e2e: runs end-to-end tests\n  stop: Stops the CRC VM\n  ssh: SSHs into the CRC VM for debugging purposes\n  login: Log in the OpenShift cluster\n  clean [<config-file> <what>]: Cleans different aspects of the test deployment.  Defaults to everything except the crc installation. We can limit what to clean if we provide a configuration file (it can be '') and then what we want to clean as a series of parameters. Passing \"$0 clean '' all\" is equivalent to: \"$0 '' clean $CLEAN_OPTIONS\".\n\n<config-file>: Configuration file, which defaults to "config" in the current directory (check the "sample_config" file for available options).\n\nEvery action will ensure required steps will have been completed.\nFor example, if we run the operator action it will ensure downloads, setup, and run have been completed."
+        echo -e "\nEmber-CSI simple test tool on OpenShift:\n$1 <action> [<config-file>] [<action-options>]\n\n<action>:\n  download: downloads the CRC files\n  setup: setup CRC dependencies\n  run: starts the CRC VM running OpenShift\n  operator: installs the Ember-CSI operator from a catalog (defaults to the community)\n  container: build/download the custom driver container and upload to the cluster.\n  driver: deploys an Ember-CSI driver (defaults to lvmdriver.yaml)\n  sanity: runs csi-sanity tests\n  e2e: runs end-to-end tests\n  stop: Stops the CRC VM\n  ssh: SSHs into the CRC VM for debugging purposes\n  scp_to: SCP files into the CRC VM\n  login: Log in the OpenShift cluster\n  clean [<config-file> <what>]: Cleans different aspects of the test deployment.  Defaults to everything except the crc installation. We can limit what to clean if we provide a configuration file (it can be '') and then what we want to clean as a series of parameters. Passing \"$0 clean '' all\" is equivalent to: \"$0 '' clean $CLEAN_OPTIONS\".\n\n<config-file>: Configuration file, which defaults to "config" in the current directory (check the "sample_config" file for available options).\n\nEvery action will ensure required steps will have been completed.\nFor example, if we run the operator action it will ensure downloads, setup, and run have been completed."
 }
 
 
@@ -669,6 +669,17 @@ function do_ssh {
   SSH_PARAMS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~`whoami`/.crc/machines/crc/id_rsa"
   SSH_REMOTE="core@`${CRC} ip`"
   ssh $SSH_PARAMS $SSH_REMOTE "$@"
+}
+
+
+# =============================================================================
+# SCP TO VM
+# =============================================================================
+
+function do_scp_to {
+  SSH_PARAMS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~`whoami`/.crc/machines/crc/id_rsa"
+  SSH_REMOTE="core@`${CRC} ip`"
+  scp $SSH_PARAMS "$1" "$SSH_REMOTE:$2"
 }
 
 
@@ -829,6 +840,10 @@ case $COMMAND in
 
   ssh)
     do_ssh "${@:3}"
+    ;;
+
+  scp_to)
+    do_scp_to "${@:3}"
     ;;
 
   login)

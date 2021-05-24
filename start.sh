@@ -377,6 +377,12 @@ function run_crc {
   # Create the VG if it doesn't exist yet
   do_ssh 'sudo bash -c '\''if ! vgdisplay ember-volumes ; then truncate -s 10G /var/lib/containers/ember-volumes && device=`losetup --show -f /var/lib/containers/ember-volumes ` && echo -e \"device is $device\n\" && pvcreate $device && vgcreate ember-volumes $device && vgscan && sed -i "s/^\tudev_sync = 1/\tudev_sync = 0/" /etc/lvm/lvm.conf && sed -i "s/^\tudev_rules = 1/\tudev_rules = 0/" /etc/lvm/lvm.conf; fi'\'
 
+  # Post run custom scripts
+  if [[ -n "${POST_RUN_PHASE_EXEC}" && -n "${start_crc}" ]]; then
+    echo "Running port run phase script ${POST_RUN_PHASE_EXEC}"
+    "${POST_RUN_PHASE_EXEC}"
+  fi
+
   echo -e "\n\n${YELLOW}If you are running this on a different host/VM, you can access the web console by:\n  - Setting your browser's proxy to this host's IP and port 8888\n  - Going to https://console-openshift-console.apps-crc.testing\n  - Using below credentials (kubeadmin should be entered as kube:admin)\n`${CRC} console --credentials`${NC}\n"
 
   echo -e "\n${YELLOW}To access the cluster from the command line you can run:\n  \$ eval \`${CRC} oc-env\`\n  \$ $0 login${NC}\n"

@@ -5,8 +5,8 @@
 # Set to anything to enable script debugging
 DEBUG=''
 
-# OpenShift version to use: 4.5, 4.6, or 4.7
-OPENSHIFT_VERSION='4.6'
+# OpenShift version to use: 4.6 or 4.7
+OPENSHIFT_VERSION='4.7'
 
 # Location where we want to untar and keep the crc binary after untaring it
 CRC_DIR=~/crc-linux
@@ -21,10 +21,9 @@ ARTIFACTS_DIR="${SCRIPT_DIR}/test-artifacts"
 # Directory to store yum, dnf, pip, and wheel caches.
 CACHE_DIR="${ARTIFACTS_DIR}/caches"
 
-# OpenShift pull secret.
+# OpenShift pull secret, required!
 # You can download and use your own secret from
 # https://cloud.redhat.com/openshift/install/crc/installer-provisioned
-# If configured secret file doesn't exist, a fake one will be created.
 SECRET_FILE="pull-secret"
 
 # POST_RUN_PHASE_EXEC

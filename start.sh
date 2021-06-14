@@ -100,7 +100,7 @@ CACHE_DIR="${ARTIFACTS_DIR}/caches"
 INTERNAL_REGISTRY_URL='image-registry.openshift-image-registry.svc:5000'
 
 CRC_DIR=~/crc-linux
-SECRET_FILE='fake-secret'
+SECRET_FILE='pull-secret'
 
 OC_PATH=~/.crc/bin/oc/oc
 
@@ -114,7 +114,7 @@ OPERATOR_CONTAINER='embercsi/ember-csi-operator:latest'
 OPERATOR_DOCKERFILE='build/Dockerfile.multistage'
 OPERATOR_SOURCE=
 
-OPENSHIFT_VERSION='4.5'
+OPENSHIFT_VERSION='4.6'
 
 if [[ -z "${CONFIG}" ]]; then
   echo 'No config file defined in command line'
@@ -142,8 +142,6 @@ if [[ "${OPENSHIFT_VERSION}" == '4.7' ]]; then
   VM_KEY='id_ecdsa'
 elif [[ "${OPENSHIFT_VERSION}" == '4.6' ]]; then
   CRC_VERSION='1.20.0'
-elif [[ "${OPENSHIFT_VERSION}" == '4.5' ]]; then
-  CRC_VERSION='1.17.0'
 else
   echo "${RED}Unknown OPENSHIFT_VERSION: ${OPENSHIFT_VERSION}${NC}"
   exit 4
@@ -215,12 +213,12 @@ function get_crc {
 
 function check_credentials {
   if [[ ! -e "${SECRET_FILE}" ]]; then
-    echo "No secret present at ${SECRET_FILE}, writing a fake one"
-    echo '{"auths":{"fake":{"auth": "bar"}}}' > "${SECRET_FILE}"
+    echo "No secret present at ${SECRET_FILE}, one is required"
+    exit 7
   fi
 
-  if [[ "${OPENSHIFT_VERSION}" != '4.5' ]] && grep -q fake "${SECRET_FILE}" ; then
-    echo "${RED}Fake credentials only work on OpenShift version 4.5${NC}"
+  if grep -q fake "${SECRET_FILE}" ; then
+    echo "${RED}Fake credentials don't work on OpenShift versions 4.6 or later"
     exit 5
   fi
 }
@@ -244,20 +242,17 @@ function setup_crc {
   "${CRC}" setup
 
   # CRC versions higher than 1.17 have higher CPU and memory requirements
-  if [[ $CRC_VERSION != '1.17.0' ]]; then
-
-    # If we have more than 6 CPUs, use 6 for the CRC VM
-    num_cpus=`grep -c processor /proc/cpuinfo`
-    if [[ $num_cpus -gt 6 ]]; then
-      echo "Increasing CRC VM CPUs to 6"
-      "${CRC}" config set cpus 6
-    fi
-    # If we have more than 14 GB of RAM, use 12 for the CRC VM
-    total_memory=`grep MemTotal /proc/meminfo | tr -s ' ' '\t'|cut -f2`
-    if [[ $total_memory -ge 14680064 ]]; then
-      echo "Increasing CRC VM RAM to 12 GB"
-      "${CRC}" config set memory 12288
-    fi
+  # If we have more than 6 CPUs, use 6 for the CRC VM
+  num_cpus=`grep -c processor /proc/cpuinfo`
+  if [[ $num_cpus -gt 6 ]]; then
+    echo "Increasing CRC VM CPUs to 6"
+    "${CRC}" config set cpus 6
+  fi
+  # If we have more than 14 GB of RAM, use 12 for the CRC VM
+  total_memory=`grep MemTotal /proc/meminfo | tr -s ' ' '\t'|cut -f2`
+  if [[ $total_memory -ge 14680064 ]]; then
+    echo "Increasing CRC VM RAM to 12 GB"
+    "${CRC}" config set memory 12288
   fi
 
   # Setup tinyproxy so we can access the web console if we are running this on
@@ -291,24 +286,6 @@ function setup_crc {
 }
 
 
-function increase_timeout_marketplace {
-  operator=$1
-  if [[ "${CRC_VERSION}" != '1.17.0' ]]; then
-    return
-  fi
-
-  echo "Increasing probe timeout for the ${operator} marketplace operator"
-  while ! oc get -n openshift-marketplace deployment.apps/${operator}-operators ; do
-    sleep 5
-  done
-
-  # Sometimes marketplace operators probes keep failing, so we increase their
-  # timeouts, as per https://access.redhat.com/solutions/5388381
-  patch_json="{\"spec\": {\"template\": {\"spec\": {\"containers\": [{\"name\": \"${operator}-operators\", \"livenessProbe\": {\"initialDelaySeconds\": 60, \"timeoutSeconds\": 5}, \"readinessProbe\": {\"initialDelaySeconds\": 120, \"timeoutSeconds\": 5}}]}}}}"
-  oc patch deployment.apps/${operator}-operators -n openshift-marketplace --patch "$patch_json"
-}
-
-
 # Start CRC to get the OpenShift cluster
 function run_crc {
   do_wait="$1"
@@ -330,9 +307,6 @@ function run_crc {
 
     login
 
-    increase_timeout_marketplace 'certified'
-    increase_timeout_marketplace 'community'
-
     if [[ -n "${do_wait}" ]]; then
       echo "Giving time for the cluster to stabilize (2 min sleep)"
       sleep 120
@@ -346,31 +320,19 @@ function run_crc {
   # https://code-ready.github.io/crc/#starting-monitoring-alerting-telemetry_gsg
   echo "Deploying the cluster wide snapshot controller"
 
-  # AFAIK to deploy the csi-snapshot-controller with commented mechanism only
-  # works if we are not using fake credentials, but since could be running with
-  # fake credentials, we better use a custom manifest to deploy it.
-  #
-  if grep -q fake "${SECRET_FILE}"; then
-    # These manifest come from https://github.com/kubernetes-csi/external-snapshotter/tree/master/deploy/kubernetes/csi-snapshotter
-    oc apply -f "$MANIFEST_DIR/deployment/rbac-snapshot-controller.yaml"
-    sed -e "s/latest/${OPENSHIFT_VERSION}/g" "$MANIFEST_DIR/deployment/setup-snapshot-controller.yaml" | oc apply -f -
-    snap_namespace='default'
-
-  else
-    if ID=`oc get clusterversion version -ojsonpath='{range .spec.overrides[*]}{.name}{"\n"}{end}' | nl -v 0 -w 1 | grep csi-snapshot-controller-operator | cut -f 1`; then
-      oc patch clusterversion/version --type='json' -p '[{"op":"remove", "path":"/spec/overrides/'${ID}'"}]'
-    fi
-
-    snap_namespace='openshift-cluster-storage-operator'
-
-    echo -n "Waiting for the snapshot operator to be running ..."
-    while true; do
-      echo -n '.'
-      oc wait --namespace $snap_namespace --for=condition=Ready --timeout=15s -l app=csi-snapshot-controller-operator pod 2>/dev/null && break
-      sleep 5
-    done
-    echo
+  if ID=`oc get clusterversion version -ojsonpath='{range .spec.overrides[*]}{.name}{"\n"}{end}' | nl -v 0 -w 1 | grep csi-snapshot-controller-operator | cut -f 1`; then
+    oc patch clusterversion/version --type='json' -p '[{"op":"remove", "path":"/spec/overrides/'${ID}'"}]'
   fi
+
+  snap_namespace='openshift-cluster-storage-operator'
+
+  echo -n "Waiting for the snapshot operator to be running ..."
+  while true; do
+    echo -n '.'
+    oc wait --namespace $snap_namespace --for=condition=Ready --timeout=15s -l app=csi-snapshot-controller-operator pod 2>/dev/null && break
+    sleep 5
+  done
+  echo
 
   echo -n "Waiting for the snapshot controller to be running ..."
   while [[ -z `oc get pod --namespace $snap_namespace -l app=csi-snapshot-controller 2>/dev/null` ]]; do
@@ -526,12 +488,7 @@ function install_operator {
   impersonate_container "$OPERATOR_SOURCE" "$OPERATOR_REGISTRY" "$OPERATOR_CONTAINER" "${OPERATOR_DOCKERFILE}"
 
   echo -n "Wait for the community marketplace operator ..."
-  if [[ "${OPENSHIFT_VERSION}" == '4.5' ]]; then
-    label_match='marketplace.operatorSource=community-operators'
-  # 4.6 and 4.7
-  else
-    label_match='olm.catalogSource=community-operators'
-  fi
+  label_match='olm.catalogSource=community-operators'
 
   while ! oc wait --for=condition=Ready --timeout=5s -n openshift-marketplace -l $label_match pod 2>/dev/null ; do
     echo -n '.'

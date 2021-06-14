@@ -409,7 +409,7 @@ function impersonate_container {
 
   else
     echo "Source is not a directory, assuming it's a container. Pulling custom container ${source_location}"
-    sudo podman pull --tls-verify=false "${source_location}"
+    sudo podman pull --tls-verify=false --authfile=`realpath "${SECRET_FILE}"`  "${source_location}"
     sudo podman tag "${source_location}" "${container_location}"
   fi
 

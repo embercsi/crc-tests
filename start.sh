@@ -133,7 +133,14 @@ fi
 
 exec &> >(tee -a "${ARTIFACTS_DIR}/execution.log")
 
-if [[ "${OPENSHIFT_VERSION}" == '4.6' ]]; then
+SET_TELEMETRY=0
+VM_KEY='id_rsa'
+
+if [[ "${OPENSHIFT_VERSION}" == '4.7' ]]; then
+  CRC_VERSION='1.27.0'
+  SET_TELEMETRY=1
+  VM_KEY='id_ecdsa'
+elif [[ "${OPENSHIFT_VERSION}" == '4.6' ]]; then
   CRC_VERSION='1.20.0'
 elif [[ "${OPENSHIFT_VERSION}" == '4.5' ]]; then
   CRC_VERSION='1.17.0'
@@ -228,6 +235,11 @@ function setup_crc {
 
   echo "CRC version ${CRC_VERSION} with OpenShift ${OPENSHIFT_VERSION}"
 
+  # Disable telemetry to make sure that the setup doesn't ask for it
+  if [[ "${SET_TELEMETRY}" == '1' ]]; then
+    "${CRC}" config set consent-telemetry no
+  fi
+
   echo "Setting up CRC requirements"
   "${CRC}" setup
 
@@ -281,7 +293,7 @@ function setup_crc {
 
 function increase_timeout_marketplace {
   operator=$1
-  if [[ "${CRC_VERSION}" == '1.20.0' ]]; then
+  if [[ "${CRC_VERSION}" != '1.17.0' ]]; then
     return
   fi
 
@@ -462,7 +474,7 @@ function upload_impersonate {
   echo "Ensuring that the ${project} registry/namespace/project exists and is accessible by all projects"
   sed -e "s/embercsi/${project}/g" "${MANIFEST_DIR}/deployment/emberproject" | oc apply -f -
 
-  SSH_PARAMS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~`whoami`/.crc/machines/crc/id_rsa"
+  SSH_PARAMS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~`whoami`/.crc/machines/crc/${VM_KEY}"
   SSH_REMOTE="core@`${CRC} ip`"
   # Docs on registries.conf: https://github.com/containers/image/blob/master/docs/containers-registries.conf.5.md
   # For unqualified images we must add the internal registry to the search list
@@ -516,7 +528,7 @@ function install_operator {
   echo -n "Wait for the community marketplace operator ..."
   if [[ "${OPENSHIFT_VERSION}" == '4.5' ]]; then
     label_match='marketplace.operatorSource=community-operators'
-  # 4.6
+  # 4.6 and 4.7
   else
     label_match='olm.catalogSource=community-operators'
   fi
@@ -662,7 +674,7 @@ function crc_status {
 function stop_crc {
   echo 'Stopping and removing the CRC VM'
   if crc_status; then
-    "${CRC}" -f delete
+    "${CRC}" delete -f
   fi
 }
 
@@ -672,7 +684,7 @@ function stop_crc {
 # =============================================================================
 
 function do_ssh {
-  SSH_PARAMS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~`whoami`/.crc/machines/crc/id_rsa"
+  SSH_PARAMS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~`whoami`/.crc/machines/crc/${VM_KEY}"
   SSH_REMOTE="core@`${CRC} ip`"
   ssh $SSH_PARAMS $SSH_REMOTE "$@"
 }
@@ -683,7 +695,7 @@ function do_ssh {
 # =============================================================================
 
 function do_scp_to {
-  SSH_PARAMS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~`whoami`/.crc/machines/crc/id_rsa"
+  SSH_PARAMS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~`whoami`/.crc/machines/crc/${VM_KEY}"
   SSH_REMOTE="core@`${CRC} ip`"
   scp $SSH_PARAMS "$1" "$SSH_REMOTE:$2"
 }
@@ -783,7 +795,7 @@ function clean_crc {
       registries)
         if crc_status; then
           login
-          SSH_PARAMS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~`whoami`/.crc/machines/crc/id_rsa"
+          SSH_PARAMS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~`whoami`/.crc/machines/crc/${VM_KEY}"
           SSH_REMOTE="core@`${CRC} ip`"
           ssh $SSH_PARAMS $SSH_REMOTE "echo -e \"unqualified-search-registries = ['registry.access.redhat.com', 'docker.io']\" | sudo tee /etc/containers/registries.conf"
         fi

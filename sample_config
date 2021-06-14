@@ -5,7 +5,7 @@
 # Set to anything to enable script debugging
 DEBUG=''
 
-# OpenShift version to use: 4.5 or 4.6
+# OpenShift version to use: 4.5, 4.6, or 4.7
 OPENSHIFT_VERSION='4.6'
 
 # Location where we want to untar and keep the crc binary after untaring it

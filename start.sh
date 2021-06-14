@@ -88,7 +88,7 @@ CONFIG="${2}"
 DEBUG=
 
 DRIVER_FILE=lvmdriver.yaml
-CATALOG=community-operators
+CATALOG=community
 
 PWD=`pwd`
 SCRIPT_DIR=$(dirname `realpath $0`)
@@ -496,14 +496,14 @@ function install_operator {
   done
   echo
 
-  if [ "${CATALOG}" != "community-operators" ]; then
+  if [ "${CATALOG}" != "community" ]; then
     echo "Setup custom marketplace to install devel branch of ember operator"
     oc apply -f "${manifests}/catalog.yaml"
   fi
 
   echo "Subscribing (installing) the operator"
   oc apply -f "$manifests/operatorgroup.yaml"
-  sed -e "s/community-operators/${CATALOG}/g" "$manifests/subscription.yaml" | oc apply -f -
+  sed -e "s/community-operators/${CATALOG}-operators/g" "$manifests/subscription.yaml" | oc apply -f -
 
   echo -n "Waiting for the operator to be installed ..."
   while true; do
@@ -744,7 +744,7 @@ function clean_crc {
           fi
           oc delete operatorgroup ember-operatorgroup -n default || true
 
-          if [ "${CATALOG}" != "community-operators" ]; then
+          if [ "${CATALOG}" != "community" ]; then
             oc delete -f "${manifests}/catalog.yaml" || true
           fi
         fi

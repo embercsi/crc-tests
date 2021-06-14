@@ -37,9 +37,8 @@ SECRET_FILE="pull-secret"
 # configuration options used by the form.
 DRIVER_FILE='lvmdriver.yaml'
 
-# Catalog entry to use. Valid values are community-operators and
-# external-operators
-CATALOG=community-operators
+# Catalog entry to use. Valid values are community, redhat, custom
+CATALOG=community
 
 # A template used to build the string with the container that has the e2e tests
 E2E_CONTAINER_TEMPLATE='embercsi/openshift-tests:${OPENSHIFT_VERSION}'

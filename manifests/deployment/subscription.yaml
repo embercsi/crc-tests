@@ -5,6 +5,6 @@ metadata:
   namespace: default
 spec:
   channel: beta
-  name: ember-csi-community-operator
-  source: community-operators
+  name: subscription_name
+  source: marketplace_catalog-operators
   sourceNamespace: openshift-marketplace

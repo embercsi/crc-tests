@@ -1,0 +1,10 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ember-csi-operator
+spec:
+  template:
+    spec:
+      containers:
+      - name: ember-csi-operator
+        image: operator_image

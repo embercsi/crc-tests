@@ -1,0 +1,2 @@
+{"metadata": {"annotations": {"containerImage": "operator_image"}},
+"spec":{"install":{"spec":{"deployments":[deployment_data]}}}}

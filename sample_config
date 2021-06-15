@@ -38,7 +38,48 @@ SECRET_FILE="pull-secret"
 DRIVER_FILE='lvmdriver.yaml'
 
 # Catalog entry to use. Valid values are community, redhat, custom
+# Ignored if CATALOG_SOURCE is defined
 CATALOG=community
+
+# CATALOG_SOURCE
+#   Assume it's from source code if a directory exists with this name,
+#   otherwise it should be a container: [registry/][project/]container[:tag]
+#   This must be a catalog bundle, not an index
+#   Examples:
+#     CATALOG_SOURCE=/home/geguileo/code/ember-csi-operator
+#     CATALOG_SOURCE=quay.io/embercsi/embercsi-catalog:test
+
+# CATALOG_DOCKERFILE
+#   When CATALOG_SOURCE is a directory with the source code, here we have the
+#   Dockerfile location relative to the CATALOG_SOURCE directory.
+#   Defaults to Dockerfile
+
+# CATALOG_CONTEXT
+#   The container building context path for the catalog relative to
+#   CATALOG_SOURCE for when it's not the base directory of CATALOG_SOURCE.
+#   Defaults to the CATALOG_SOURCE location.
+#   Example:
+#     CATALOG_CONTEXT=deploy/
+
+
+# INDEX_SOURCE
+#   Assume it's from source code if a directory exists with this name,
+#   otherwise it should be a container: [registry/][project/]container[:tag]
+#   This must be an index, not a catalog bundle
+#   Examples:
+#     INDEX_SOURCE=/home/geguileo/code/ember-csi-operator
+#     INDEX_SOURCE=quay.io/embercsi/embercsi-catalog:test
+
+# INDEX_DOCKERFILE
+#   When INDEX_SOURCE is a directory with the source code, here we have the
+#   Dockerfile location relative to the INDEX_SOURCE directory.
+#   Defaults to build/Dockerfile.catalog
+
+# INDEX_CONTEXT
+#   The container building context path for the catalog relative to
+#   INDEX_SOURCE for when it's not the base directory of INDEX_SOURCE.
+#   Example/default:
+#     INDEX_CONTEXT=deploy/olm-catalog
 
 # A template used to build the string with the container that has the e2e tests
 E2E_CONTAINER_TEMPLATE='embercsi/openshift-tests:${OPENSHIFT_VERSION}'

@@ -80,6 +80,11 @@ YELLOW='\033[1;33m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
+
+# Instead of using an array we can get the subscription name and probably even replace the image
+#  oc describe packagemanifest -n openshift-marketplace ember-csi-operator
+declare -A subscription_names=( ["community"]="ember-csi-community-operator" ["redhat"]="ember-csi-operator" )
+
 ACTION_PARAMS=("${@:3}")
 
 COMMAND=${1}
@@ -89,6 +94,12 @@ DEBUG=
 
 DRIVER_FILE=lvmdriver.yaml
 CATALOG=community
+CATALOG_SOURCE=
+CATALOG_DOCKERFILE='Dockerfile'
+CATALOG_CONTEXT='.'
+INDEX_SOURCE=
+INDEX_DOCKERFILE='build/Dockerfile.catalog'
+INDEX_CONTEXT='deploy/olm-catalog'
 
 PWD=`pwd`
 SCRIPT_DIR=$(dirname `realpath $0`)
@@ -133,6 +144,16 @@ fi
 
 exec &> >(tee -a "${ARTIFACTS_DIR}/execution.log")
 
+if [[ -n "$CATALOG_SOURCE" || -n "$INDEX_SOURCE" ]]; then
+  MARKETPLACE_CATALOG=custom
+fi
+
+if [[ -n "${CATALOG_SOURCE}" && -n "${INDEX_SOURCE}" ]]; then
+  echo 'Cannot set both CATALOG_SOURCE and INDEX_SOURCE'
+  exit 8
+fi
+
+
 SET_TELEMETRY=0
 VM_KEY='id_rsa'
 
@@ -140,13 +161,22 @@ if [[ "${OPENSHIFT_VERSION}" == '4.7' ]]; then
   CRC_VERSION='1.27.0'
   SET_TELEMETRY=1
   VM_KEY='id_ecdsa'
+  OPM_VERSION='4.7.11'
 elif [[ "${OPENSHIFT_VERSION}" == '4.6' ]]; then
   CRC_VERSION='1.20.0'
+  OPM_VERSION='4.6.17'
 else
   echo "${RED}Unknown OPENSHIFT_VERSION: ${OPENSHIFT_VERSION}${NC}"
   exit 4
 fi
 
+OPM_URL="https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/${OPM_VERSION}/opm-linux.tar.gz"
+OPM_TEMP_FILE="${ARTIFACTS_DIR}/opm.tar.xz"
+OPM="${CRC_DIR}/opm"
+CATALOG_CONTAINER_REPO='localhost:5000'
+CATALOG_CONTAINER_NAME='embercsi/embercsi-operator-bundle:latest'
+INDEX_CONTAINER_REPO='quay.io'
+INDEX_CONTAINER_NAME='embercsi/embercsi-index:latest'
 
 E2E_CONTAINER="embercsi/openshift-tests:${OPENSHIFT_VERSION}"
 
@@ -154,7 +184,7 @@ CRC_URL=https://mirror.openshift.com/pub/openshift-v4/clients/crc/${CRC_VERSION}
 CRC_TEMP_FILE="${ARTIFACTS_DIR}/crc.tar.xz"
 CRC="${CRC_DIR}/crc"
 
-CLEAN_OPTIONS='tar vm crc artifacts operator operator-container driver container registries e2e'
+CLEAN_OPTIONS='tar vm crc artifacts operator operator-container driver container container-catalog-source catalog-source registries e2e'
 DEFAULT_CLEAN_OPTIONS=('tar vm artifacts operator-container container')
 
 
@@ -378,15 +408,13 @@ function get_container_location {
 }
 
 
-# Spoof a container in our OpenShift cluster given a source location (directory
-# or container), the registry and container we want to impersonate, and
-# the docker file to generate the container if the source is a directory
-# (source code).
-function impersonate_container {
+# Build or download a container
+function make_container_available {
   source_location="$1"
   dest_registry=$2
   dest_container=$3
   docker_file="$4"
+  context_dir="$5"
 
   if [[ -z "${source_location}" ]]; then return; fi
 
@@ -405,13 +433,28 @@ function impersonate_container {
 
     echo "Building container from source at ${source_location}/${docker_file}"
     mkdir -p "${cache_location}"
-    sudo podman build --build-arg RELEASE=master --build-arg VERSION=`date +%d.%m.%Y.dev%H%M%S%N`  -t "${container_location}" -v "${cache_location}:/var/cache:rw,shared,z" -f "${docker_file}" "${source_location}"
+    sudo podman build --build-arg RELEASE=master --build-arg VERSION=`date +%d.%m.%Y.dev%H%M%S%N`  -t "${container_location}" -v "${cache_location}:/var/cache:rw,shared,z" -f "${source_location}/${docker_file}" "${source_location}/${context_dir}"
 
   else
     echo "Source is not a directory, assuming it's a container. Pulling custom container ${source_location}"
     sudo podman pull --tls-verify=false --authfile=`realpath "${SECRET_FILE}"`  "${source_location}"
     sudo podman tag "${source_location}" "${container_location}"
   fi
+
+}
+
+
+# Spoof a container in our OpenShift cluster given a source location (directory
+# or container), the registry and container we want to impersonate, and
+# the docker file to generate the container if the source is a directory
+# (source code).
+function impersonate_container {
+  source_location="$1"
+  dest_registry=$2
+  dest_container=$3
+
+  if [[ -z "${source_location}" ]]; then return; fi
+  make_container_available $@
 
   upload_impersonate "$dest_registry" "$dest_container"
 }
@@ -473,6 +516,68 @@ function upload_impersonate {
   sudo podman push --tls-verify=false "${local_container}" docker://"${HOST}/${dest_container}"
 }
 
+# =============================================================================
+# CATALOG
+# =============================================================================
+function get_opm {
+  if [[ ! -e "${OPM}" ]]; then
+    if [[ ! -e "$OPM_TEMP_FILE" ]]; then
+      echo "Downloading OPM file"
+      curl -Lo "$OPM_TEMP_FILE" $OPM_URL
+    else
+      echo "OPM file "${OPM_TEMP_FILE}" already present in the system"
+    fi
+
+    echo "Untaring OPM file to $CRC_DIR"
+    mkdir -p "${CRC_DIR}"
+    tar --extract --directory "${CRC_DIR}" --file "${OPM_TEMP_FILE}"
+
+  else
+    echo "OPM already present at ${CRC_DIR}"
+  fi
+}
+
+function install_catalog {
+  run_crc true
+  login
+
+  if [[ -z "${CATALOG_SOURCE}" && -z "${INDEX_SOURCE}" ]]; then return; fi
+
+  manifests="${MANIFEST_DIR}/deployment"
+
+  if [ -n "${CATALOG_SOURCE}" ]; then
+    echo "Getting custom catalog from source"
+    # make_container_available "$CATALOG_SOURCE" "$CATALOG_CONTAINER_REPO" "$CATALOG_CONTAINER_NAME" "${CATALOG_DOCKERFILE}" "${CATALOG_CONTEXT}"
+    impersonate_container "$CATALOG_SOURCE" "$CATALOG_CONTAINER_REPO" "$CATALOG_CONTAINER_NAME" "${CATALOG_DOCKERFILE}" "${CATALOG_CONTEXT}"
+
+    if sudo podman inspect registry; then
+      echo "Local image registry already running"
+    else
+      echo "Running local image registry"
+      sudo podman run -d -p 5000:5000 --name registry registry:2
+    fi
+
+    echo "Pushing catalog image to local registry"
+    sudo podman push --tls-verify=false ${CATALOG_CONTAINER_REPO}/${CATALOG_CONTAINER_NAME}
+
+    get_opm
+
+    echo "Building catalog index"
+    cd "${CRC_DIR}"
+    sudo "${OPM}" index add --skip-tls -p podman --bundles "${CATALOG_CONTAINER_REPO}/${CATALOG_CONTAINER_NAME}" --tag "${INDEX_CONTAINER_REPO}/${INDEX_CONTAINER_NAME}"
+    cd -
+
+  else
+    make_container_available "$INDEX_SOURCE" "$INDEX_CONTAINER_REPO" "$INDEX_CONTAINER_NAME" "${INDEX_DOCKERFILE}" "${INDEX_CONTEXT}"
+  fi
+
+  echo "Uploading catalog index to OpenShift"
+  upload_impersonate "$INDEX_CONTAINER_REPO" "$INDEX_CONTAINER_NAME"
+
+  echo "Creating catalog source in the cluster"
+  sed -e "s#catalog_image#${INDEX_CONTAINER_REPO}/${INDEX_CONTAINER_NAME}#g" "$manifests/catalogsource.yaml" | oc apply -f -
+}
+
 
 # =============================================================================
 # OPERATOR
@@ -480,7 +585,7 @@ function upload_impersonate {
 
 function install_operator {
   # Pass parameter to select the source of the operator
-  run_crc true
+  install_catalog
   login
 
   manifests="${MANIFEST_DIR}/deployment"
@@ -488,7 +593,7 @@ function install_operator {
   impersonate_container "$OPERATOR_SOURCE" "$OPERATOR_REGISTRY" "$OPERATOR_CONTAINER" "${OPERATOR_DOCKERFILE}"
 
   echo -n "Wait for the community marketplace operator ..."
-  label_match='olm.catalogSource=community-operators'
+  label_match="olm.catalogSource=${MARKETPLACE_CATALOG}-operators"
 
   while ! oc wait --for=condition=Ready --timeout=5s -n openshift-marketplace -l $label_match pod 2>/dev/null ; do
     echo -n '.'
@@ -496,14 +601,59 @@ function install_operator {
   done
   echo
 
-  if [ "${CATALOG}" != "community" ]; then
-    echo "Setup custom marketplace to install devel branch of ember operator"
-    oc apply -f "${manifests}/catalog.yaml"
-  fi
-
   echo "Subscribing (installing) the operator"
   oc apply -f "$manifests/operatorgroup.yaml"
-  sed -e "s/community-operators/${CATALOG}-operators/g" "$manifests/subscription.yaml" | oc apply -f -
+  SUBSCRIPTION_NAME="${subscription_names[$CATALOG]}"
+  sed -e "s/subscription_name/${SUBSCRIPTION_NAME}/g" -e "s/marketplace_catalog/${MARKETPLACE_CATALOG}/g" "$manifests/subscription.yaml" | oc apply -f -
+
+  if [[ -n "${OPERATOR_SOURCE}" ]]; then
+    # When replacing the operator we need to change the CSV as well as it may be
+    # pinned to an image based on its hash (which we can't impersonate)
+    # We decided to change the CSV instead of the Deployment because CSV is the
+    # driver of the Deployment, and just changing the Deployment may lead to
+    # issues if the CSV decides to replace the patched Deployment.
+
+    container_location=$(get_container_location "$OPERATOR_REGISTRY" "$OPERATOR_CONTAINER")
+
+    echo -n 'Waiting for the CSV to be present'
+    while [[ -z `oc get csv -l operators.coreos.com/ember-csi-operator.default -o=jsonpath='{.items...metadata.name}'` ]]; do
+      echo -n '.'
+      sleep 5
+    done
+
+    csv_operator_image=`oc get csv -l operators.coreos.com/ember-csi-operator.default -o=jsonpath='{.items...image}'|head -n1`
+    if [[ "${csv_operator_image}" != "${container_location}" ]]; then
+      echo -e "\nCSV operator image does not match ${container_location}"
+
+      # Locate the CSV name, since it's version dependent, for patching
+      csv_name=`oc get csv -l operators.coreos.com/ember-csi-operator.default -o=jsonpath='{.items...metadata.name}'|head -n1`
+      echo "Replacing CSV ${csv_name} operator image ..."
+      file_path="$manifests/csv-operator-image.json"
+      # Patching a deployment modifies the whole deployment, so we need to get
+      # the current values and just modify the image.
+      csv_deployment=`oc get csv $csv_name -o=jsonpath='{.spec.install.spec.deployments[0]}' | sed -e "s#image\":\"[^\"]*\"#image\":\"${container_location}\"#g"`
+
+      # Now we change the deployment as well as the annotation of the
+      # containerImage using the json file
+      oc patch csv ${csv_name} --patch "`sed -e s#operator_image#${container_location}#g -e s#deployment_data#${csv_deployment}#g $file_path`" --type=merge
+
+      # # The following code seems to fail many times, as we end up with 2 pods, one that runs and one that doesn't
+      # # In theory it should be faster to get it running
+      # # # We could wait for the CSV to replace the Deployment, but usually by the time we replaced the image in the CSV the
+      # # image in the Deployment is already the wrong one and it takes a while for the CSV to fix it.
+      # echo -n "Waiting for the operator's deployment to be created ..."
+      # while ! oc get deployment/ember-csi-operator 2>/dev/null ; do
+      #   echo -n '.'
+      #   sleep 5
+      # done
+      # oc get deployment/ember-csi-operator
+      # echo -e "\nReplacing the deployment's operator image ..."
+      # container_location=$(get_container_location "$OPERATOR_REGISTRY" "$OPERATOR_CONTAINER")
+      # file_path="$manifests/catalog-operator-image.yaml"
+      # oc patch -f $file_path --patch "`sed -e s#operator_image#${container_location}#g $file_path`"
+      # oc get deployment/ember-csi-operator
+    fi
+  fi
 
   echo -n "Waiting for the operator to be installed ..."
   while true; do
@@ -610,7 +760,7 @@ function run_e2e_tests {
 # =============================================================================
 
 function show_help {
-        echo -e "\nEmber-CSI simple test tool on OpenShift:\n$1 <action> [<config-file>] [<action-options>]\n\n<action>:\n  download: downloads the CRC files\n  setup: setup CRC dependencies\n  run: starts the CRC VM running OpenShift\n  operator: installs the Ember-CSI operator from a catalog (defaults to the community)\n  container: build/download the custom driver container and upload to the cluster.\n  driver: deploys an Ember-CSI driver (defaults to lvmdriver.yaml)\n  sanity: runs csi-sanity tests\n  e2e: runs end-to-end tests\n  stop: Stops the CRC VM\n  ssh: SSHs into the CRC VM for debugging purposes\n  scp_to: SCP files into the CRC VM\n  login: Log in the OpenShift cluster\n  clean [<config-file> <what>]: Cleans different aspects of the test deployment.  Defaults to everything except the crc installation. We can limit what to clean if we provide a configuration file (it can be '') and then what we want to clean as a series of parameters. Passing \"$0 clean '' all\" is equivalent to: \"$0 '' clean $CLEAN_OPTIONS\".\n\n<config-file>: Configuration file, which defaults to "config" in the current directory (check the "sample_config" file for available options).\n\nEvery action will ensure required steps will have been completed.\nFor example, if we run the operator action it will ensure downloads, setup, and run have been completed."
+        echo -e "\nEmber-CSI simple test tool on OpenShift:\n$1 <action> [<config-file>] [<action-options>]\n\n<action>:\n  download: downloads the CRC files\n  setup: setup CRC dependencies\n  run: starts the CRC VM running OpenShift\n  catalog-source: make the container for the catalog source, be it from an index or from an operator bundle and upload to the OpenShift cluster.\n  operator: installs the Ember-CSI operator from a catalog (defaults to the community)\n  container: build/download the custom driver container and upload to the cluster.\n  driver: deploys an Ember-CSI driver (defaults to lvmdriver.yaml)\n  sanity: runs csi-sanity tests\n  e2e: runs end-to-end tests.\n  stop: Stops the CRC VM\n  ssh: SSHs into the CRC VM for debugging purposes\n  scp_to: SCP files into the CRC VM\n  login: Log in the OpenShift cluster\n  clean [<config-file> <what>]: Cleans different aspects of the test deployment.  Defaults to everything except the crc installation. We can limit what to clean if we provide a configuration file (it can be '') and then what we want to clean as a series of parameters. Passing \"$0 clean '' all\" is equivalent to: \"$0 '' clean $CLEAN_OPTIONS\".\n\n<config-file>: Configuration file, which defaults to "config" in the current directory (check the "sample_config" file for available options).\n\nEvery action will ensure required steps will have been completed.\nFor example, if we run the operator action it will ensure downloads, setup, and run have been completed."
 }
 
 
@@ -678,7 +828,7 @@ function clean_container {
   dest_registry=$2
   dest_container=$3
 
-  if [[ -z "${source_location}" ]]; then return; fi
+  # if [[ -z "${source_location}" ]]; then return; fi
 
   container_location=$(get_container_location "$dest_registry" "$dest_container")
   if [[ ! -d "${source_location}" ]]; then
@@ -704,6 +854,8 @@ function clean_crc {
       ;;
   esac
 
+  manifests="${MANIFEST_DIR}/deployment"
+
   for element in ${ACTION_PARAMS[@]}; do
     echo "Cleaning $element"
     case $element in
@@ -723,6 +875,14 @@ function clean_crc {
       container)
         clean_container "$DRIVER_SOURCE" "$DRIVER_REGISTRY" "$DRIVER_CONTAINER"
         ;;
+      container-catalog-source)
+        sudo podman rm -f registry || true
+        clean_container "${CATALOG_SOURCE}" "$CATALOG_CONTAINER_REPO" "$CATALOG_CONTAINER_NAME"
+        clean_container "${INDEX_SOURCE}" "$INDEX_CONTAINER_REPO" "$INDEX_CONTAINER_NAME"
+        ;;
+      catalog-source)
+         oc delete -f "$manifests/catalogsource.yaml" || true
+         ;;
       driver)
         if crc_status; then
           login
@@ -735,7 +895,6 @@ function clean_crc {
       operator)
         if crc_status; then
           login
-          manifests="${MANIFEST_DIR}/deployment"
 
           if oc get subscription ember-csi-operator; then
             csv_name=`oc get subscription ember-csi-operator -o jsonpath='{.status.currentCSV}'`
@@ -795,6 +954,10 @@ case $COMMAND in
 
   container)
     install_driver_container
+    ;;
+
+  catalog-source)
+    install_catalog
     ;;
 
   driver)

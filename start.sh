@@ -106,7 +106,7 @@ OC_PATH=~/.crc/bin/oc/oc
 
 DRIVER_REGISTRY='docker.io'
 DRIVER_CONTAINER='embercsi/ember-csi:master'
-DRIVER_DOCKERFILE=
+DRIVER_DOCKERFILE='Dockerfile'
 DRIVER_SOURCE=
 
 OPERATOR_REGISTRY='docker.io'

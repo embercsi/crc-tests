@@ -513,7 +513,7 @@ function upload_impersonate {
   HOST=$(oc get route default-route -n openshift-image-registry --template='{{ .spec.host }}')
   oc_user=`oc whoami`
   sudo podman login -u ${oc_user#*:} -p $(oc whoami -t) --tls-verify=false $HOST
-  sudo podman push --tls-verify=false "${local_container}" docker://"${HOST}/${dest_container}"
+  sudo podman push --tls-verify=false --remove-signatures "${local_container}" docker://"${HOST}/${dest_container}"
 }
 
 # =============================================================================

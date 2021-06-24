@@ -146,6 +146,8 @@ exec &> >(tee -a "${ARTIFACTS_DIR}/execution.log")
 
 if [[ -n "$CATALOG_SOURCE" || -n "$INDEX_SOURCE" ]]; then
   MARKETPLACE_CATALOG=custom
+else
+  MARKETPLACE_CATALOG=$CATALOG
 fi
 
 if [[ -n "${CATALOG_SOURCE}" && -n "${INDEX_SOURCE}" ]]; then
@@ -680,11 +682,12 @@ function deploy_driver {
 
   if oc get embercsis backend 2>/dev/null ; then
     echo 'Driver already present, skipping its deployment'
-    return
+  else
+    echo 'Deploying driver'
+    oc apply -f "${DRIVER_FILE}"
   fi
 
-  oc apply -f "${DRIVER_FILE}"
-  echo -n "Waiting for the driver to be installed ..."
+  echo -n "Waiting for driver to be ready ..."
   while true; do
     echo -n '.'
     oc wait --for=condition=Ready --timeout=15s -l app=embercsi pod 2>/dev/null && break
@@ -738,17 +741,7 @@ function run_e2e_tests {
   result=$?
   set -e
 
-  # Save controller and node logs
-  pods=`oc get -l app=embercsi -o go-template='{{range .items}}{{.metadata.name}}{{" "}}{{end}}' pod`
-  for pod in $pods; do
-    containers=`oc get pods ${pod} -o jsonpath='{.spec.containers[*].name}'`
-    for container in $containers; do
-      oc logs $pod -c $container > "${ARTIFACTS_DIR}/${pod}-${container}.log"
-    done
-  done
-
-  # Save kubelet logs
-  oc adm node-logs --role=master -u kubelet > "${ARTIFACTS_DIR}/kubelet.log"
+  save_logs
 
   exit $result
 
@@ -809,14 +802,64 @@ function do_scp_to {
 
 
 # =============================================================================
-# RUN CSC FOR FUNCTIONAL TESTS
+# RUN CSI-SANITY FOR FUNCTIONAL TESTS
 # =============================================================================
 
+function save_logs {
+  # Save controller and node logs
+  pods=`oc get -l app=embercsi -o go-template='{{range .items}}{{.metadata.name}}{{" "}}{{end}}' pod`
+  for pod in $pods; do
+    containers=`oc get pods ${pod} -o jsonpath='{.spec.containers[*].name}'`
+    for container in $containers; do
+      oc logs $pod -c $container > "${ARTIFACTS_DIR}/${pod}-${container}.log"
+    done
+  done
+
+  # Save kubelet logs
+  oc adm node-logs --role=master -u kubelet > "${ARTIFACTS_DIR}/kubelet.log"
+}
+
 function run_sanity {
-    oc exec -it backend-controller-0 -c ember-csi -- /bin/bash -c 'if [[ ! -e csi-sanity ]]; then curl -Lo csi-sanity https://github.com/embercsi/ember-csi/raw/master/tools/csi-sanity-v2.2.0 && chmod +x csi-sanity ; fi'
+  deploy_driver
 
-    oc exec -it backend-controller-0 -c ember-csi -- /bin/bash -c './csi-sanity --test.v --csi.endpoint=unix:///csi-data/csi.sock --test.timeout 0 --ginkgo.v --ginkgo.progress 2>&1' | tee "${ARTIFACTS_DIR}/csi-sanity.log"
+  manifest="${MANIFEST_DIR}/tests/csi-sanity.yaml"
+  echo "Removing old job if exists"
+  oc delete -f "${manifest}" || true
 
+  controller_pod_uuid=`oc get pod backend-controller-0 -o=jsonpath='{.metadata.uid}'`
+
+  # Need to wait for the sockets to avoid permission issues with the sanity tests
+  echo -n "Waiting for sockets to be created"
+  sock_files="/var/lib/kubelet/plugins/backend.ember-csi.io/csi.sock /var/lib/kubelet/pods/${controller_pod_uuid}/volumes/kubernetes.io~empty-dir/socket-dir/csi.sock"
+  for sock_file in $sock_files; do
+    while  ! ./start.sh ssh config sudo stat $sock_file; do
+      echo -n '.'
+      sleep 5
+    done
+  done
+
+  echo -e "\nRunning new csi-sanity job"
+  sed -e "s/CONTROLLER_POD_UUID/${controller_pod_uuid}/g" "${manifest}" | oc create -f -
+
+  echo "Waiting for job to complete"
+  result=''
+  while [[ ! $result =~ Failed|Complete ]]; do
+    sleep 5
+    result=`oc get job/csi-sanity -o=jsonpath='{.status.conditions[*].type}'`
+    echo -n '.'
+  done
+  echo -e "\nJob finished"
+
+  echo "Writing logs"
+  log_location="${ARTIFACTS_DIR}/csi-sanity.log"
+  oc logs job/csi-sanity 2>&1 > "${ARTIFACTS_DIR}/csi-sanity.log"
+  oc delete -f "${manifest}" || true
+  save_logs
+  if [[ "$result" == "Failed" ]]; then
+      echo "Sanity tests failed, check log at ${log_location}"
+      exit 9
+  fi
+  echo "Sanity tests passed"
 }
 
 # =============================================================================

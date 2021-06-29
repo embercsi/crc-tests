@@ -1,0 +1,31 @@
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  name: csc
+spec:
+  containers:
+    - name: csc
+      image: embercsi/csc:v1.1.0
+      command: ["tail"]
+      args: ["-f", "/dev/null"]
+      securityContext:
+        privileged: true
+        allowPrivilegeEscalation: true
+      volumeMounts:
+        - name: node-socket
+          mountPath: /node.sock
+        - name: controller-socket
+          mountPath: /controller.sock
+        - name: mountpoint-dir
+          mountPath: /var/lib/kubelet
+  volumes:
+    - name: node-socket
+      hostPath:
+        path: /var/lib/kubelet/plugins/backend.ember-csi.io/csi.sock
+    - name: controller-socket
+      hostPath:
+        path: /var/lib/kubelet/pods/CONTROLLER_POD_UUID/volumes/kubernetes.io~empty-dir/socket-dir/csi.sock
+    - name: mountpoint-dir
+      hostPath:
+        path: /var/lib/kubelet

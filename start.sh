@@ -753,7 +753,7 @@ function run_e2e_tests {
 # =============================================================================
 
 function show_help {
-        echo -e "\nEmber-CSI simple test tool on OpenShift:\n$1 <action> [<config-file>] [<action-options>]\n\n<action>:\n  download: downloads the CRC files\n  setup: setup CRC dependencies\n  run: starts the CRC VM running OpenShift\n  catalog-source: make the container for the catalog source, be it from an index or from an operator bundle and upload to the OpenShift cluster.\n  operator: installs the Ember-CSI operator from a catalog (defaults to the community)\n  container: build/download the custom driver container and upload to the cluster.\n  driver: deploys an Ember-CSI driver (defaults to lvmdriver.yaml)\n  sanity: runs csi-sanity tests\n  e2e: runs end-to-end tests. Optional parameters: num-test-runs (defaults 1) concurrency (defatuls 0)\n  stop: Stops the CRC VM\n  ssh: SSHs into the CRC VM for debugging purposes\n  scp_to: SCP files into the CRC VM\n  login: Log in the OpenShift cluster\n  clean [<config-file> <what>]: Cleans different aspects of the test deployment.  Defaults to everything except the crc installation. We can limit what to clean if we provide a configuration file (it can be '') and then what we want to clean as a series of parameters. Passing \"$0 clean '' all\" is equivalent to: \"$0 '' clean $CLEAN_OPTIONS\".\n\n<config-file>: Configuration file, which defaults to "config" in the current directory (check the "sample_config" file for available options).\n\nEvery action will ensure required steps will have been completed.\nFor example, if we run the operator action it will ensure downloads, setup, and run have been completed."
+        echo -e "\nEmber-CSI simple test tool on OpenShift:\n$1 <action> [<config-file>] [<action-options>]\n\n<action>:\n  download: downloads the CRC files\n  setup: setup CRC dependencies\n  run: starts the CRC VM running OpenShift\n  catalog-source: make the container for the catalog source, be it from an index or from an operator bundle and upload to the OpenShift cluster.\n  operator: installs the Ember-CSI operator from a catalog (defaults to the community)\n  container: build/download the custom driver container and upload to the cluster.\n  driver: deploys an Ember-CSI driver (defaults to lvmdriver.yaml)\n  sanity: runs csi-sanity tests\n  e2e: runs end-to-end tests. Optional parameters: num-test-runs (defaults 1) concurrency (defatuls 0)\n  stop: Stops the CRC VM\n  ssh: SSHs into the CRC VM for debugging purposes\n  scp_to: SCP files into the CRC VM\n  login: Log in the OpenShift cluster\n  csc <config-file> -e <socket-file> <csc-command>. Ejemplo: -e /controller.sock controller list-volumes\n  clean [<config-file> <what>]: Cleans different aspects of the test deployment.  Defaults to everything except the crc installation. We can limit what to clean if we provide a configuration file (it can be '') and then what we want to clean as a series of parameters. Passing \"$0 clean '' all\" is equivalent to: \"$0 '' clean $CLEAN_OPTIONS\".\n\n<config-file>: Configuration file, which defaults to "config" in the current directory (check the "sample_config" file for available options).\n\n<socket-file>: /controller.sock  or /node.sock \n\nEvery action will ensure required steps will have been completed.\nFor example, if we run the operator action it will ensure downloads, setup, and run have been completed."
 }
 
 
@@ -863,6 +863,29 @@ function run_sanity {
 }
 
 # =============================================================================
+# RUN CSC Command
+# =============================================================================
+# Useful to cleanup after sanity errors where we don't have PVs or PVCs
+
+function do_csc {
+  # ./start.sh csc config -e /controller.sock controller list-volumes
+  login
+  controller_pod_uuid=`oc get pod backend-controller-0 -o=jsonpath='{.metadata.uid}'`
+  sed -e "s/CONTROLLER_POD_UUID/${controller_pod_uuid}/g" "${MANIFEST_DIR}/csc.yaml" | oc apply -f -
+
+  echo "Wait for the CSC pod to be ready"
+  oc wait --for=condition=Ready pod csc
+  # SOCKET=
+  # CSC_PARAMS=("${@:1}")
+
+  # if [[ "${ACTION_PARAMS[0]}" == "node" ]]
+  #   sock_location='/node.sock'
+  # else
+  #   sock_location='/controller.sock'
+  oc exec -c csc csc -- csc ${ACTION_PARAMS[@]}
+}
+
+# =============================================================================
 # CLEAN
 # =============================================================================
 
@@ -929,7 +952,10 @@ function clean_crc {
       driver)
         if crc_status; then
           login
-          oc delete -f "${DRIVER_FILE}" || true
+          # If csc has been deployed it will no longer be pointing to the right
+          # directories after removing the driver, so remove it as well.
+          oc delete -f "${MANIFEST_DIR}/csc.yaml" --ignore-not-found=true --force=true
+          oc delete -f "${DRIVER_FILE}" --ignore-not-found=true
         fi
         ;;
       operator-container)
@@ -1017,6 +1043,10 @@ case $COMMAND in
 
   clean)
     clean_crc
+    ;;
+
+  csc)
+    do_csc
     ;;
 
   ssh)

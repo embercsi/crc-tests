@@ -115,12 +115,12 @@ SECRET_FILE='pull-secret'
 
 OC_PATH=~/.crc/bin/oc/oc
 
-DRIVER_REGISTRY='docker.io'
+DRIVER_REGISTRY='quay.io'
 DRIVER_CONTAINER='embercsi/ember-csi:master'
 DRIVER_DOCKERFILE='Dockerfile'
 DRIVER_SOURCE=
 
-OPERATOR_REGISTRY='docker.io'
+OPERATOR_REGISTRY='quay.io'
 OPERATOR_CONTAINER='embercsi/ember-csi-operator:latest'
 OPERATOR_DOCKERFILE='build/Dockerfile.multistage'
 OPERATOR_SOURCE=
@@ -982,7 +982,7 @@ function clean_crc {
           login
           SSH_PARAMS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~`whoami`/.crc/machines/crc/${VM_KEY}"
           SSH_REMOTE="core@`${CRC} ip`"
-          ssh $SSH_PARAMS $SSH_REMOTE "echo -e \"unqualified-search-registries = ['registry.access.redhat.com', 'docker.io']\" | sudo tee /etc/containers/registries.conf"
+          ssh $SSH_PARAMS $SSH_REMOTE "echo -e \"unqualified-search-registries = ['registry.access.redhat.com', 'quay.io']\" | sudo tee /etc/containers/registries.conf"
         fi
         ;;
       e2e)

@@ -97,7 +97,7 @@ E2E_CONTAINER_TEMPLATE='embercsi/openshift-tests:${OPENSHIFT_VERSION}'
 #   Defaults to Dockerfile
 #
 # DRIVER_REGISTRY
-#   URL of the registry we want to impersonate. For example: docker.io
+#   URL of the registry we want to impersonate. For example: quay.io
 #
 # DRIVER_CONTAINER
 #   Container we want to impersonate, in the form of project/container[:tag]
@@ -115,7 +115,7 @@ E2E_CONTAINER_TEMPLATE='embercsi/openshift-tests:${OPENSHIFT_VERSION}'
 #   Defaults to build/Dockerfile.multistage
 #
 # OPERATOR_REGISTRY
-#   URL of the registry we want to impersonate. For example: docker.io
+#   URL of the registry we want to impersonate. For example: quay.io
 #
 # OPERATOR_CONTAINER
 #   Container we want to impersonate, in the form of project/container[:tag]
@@ -133,8 +133,8 @@ E2E_CONTAINER_TEMPLATE='embercsi/openshift-tests:${OPENSHIFT_VERSION}'
 # Custom Ember-CSI driver and operator images from repository
 
 # Using the upstream catalog, so we need to impersonate the operator from
-# docker.io with the container we want.
-# OPERATOR_REGISTRY='docker.io'
+# quay.io with the container we want.
+# OPERATOR_REGISTRY='quay.io'
 # OPERATOR_CONTAINER='embercsi/ember-csi-operator:latest'
 # OPERATOR_SOURCE='my-registry.com/my-project/ember-csi-ember-csi-operator:latest'
 
@@ -145,7 +145,7 @@ E2E_CONTAINER_TEMPLATE='embercsi/openshift-tests:${OPENSHIFT_VERSION}'
 #==============================================================================
 # Custom operator and driver images built from source code
 
-# OPERATOR_REGISTRY='docker.io'
+# OPERATOR_REGISTRY='quay.io'
 # OPERATOR_CONTAINER='embercsi/ember-csi-operator:latest'
 # OPERATOR_SOURCE='/home/vagrant/ember-csi-operator'
 # OPERATOR_DOCKERFILE='build/Dockerfile.multistage'

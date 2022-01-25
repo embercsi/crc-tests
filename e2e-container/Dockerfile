@@ -17,8 +17,10 @@ RUN yum -y install git gcc libc-dev && \
     mkdir -p ${GOPATH}/src/github.com/openshift/ && \
     cd ${GOPATH}/src/github.com/openshift/ && \
     git clone --depth=1 -b ${BRANCH} https://github.com/openshift/openshift-tests.git && \
-    cd openshift-tests/cmd/extended-platform-tests && \
-    go build
+    cd openshift-tests && \
+    sed -i 's#> /mnt/test/initialData# & \&\& sync /mnt/test/initialData#g' vendor/k8s.io/kubernetes/test/e2e/storage/testsuites/provisioning.go && \
+    go build -o cmd/extended-platform-tests -mod vendor ./cmd/extended-platform-tests && \
+    useradd -u 1000 vagrant
 
 FROM centos:7
 COPY --from=builder /root/filter-tests.py /root/run-tests.sh /root/go/src/github.com/openshift/openshift-tests/cmd/extended-platform-tests/extended-platform-tests /root/

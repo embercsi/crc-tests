@@ -488,6 +488,9 @@ function upload_impersonate {
   do_reset=''
   local_container=$(get_container_location "$registry" "$dest_container")
 
+  # If we have built the container we may need to login again
+  login
+
   # We need to create the project so the images on the registry match upstream.
   # We also need to add the role and rolebinding in the project to allow
   # pulling these images from any project (like the openshift namespace).
@@ -726,8 +729,6 @@ function run_e2e_tests {
     cp "$oc_realpath" "${ARTIFACTS_DIR}/oc"
   fi
 
-  oc config view --raw > "${ARTIFACTS_DIR}/kubeconfig.yaml"
-
   # Due to golang's pauper regex library we cannot use --run to limit the tests
   # we run using regex negative lookahead.  So we do it in Python inside the
   # container.
@@ -740,6 +741,9 @@ function run_e2e_tests {
       login
     fi
   fi
+
+  login
+  oc config view --raw > "${ARTIFACTS_DIR}/kubeconfig.yaml"
 
   set +e
   sudo podman run --rm -it --name=e2e --network=host \

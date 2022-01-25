@@ -125,7 +125,7 @@ OPERATOR_CONTAINER='embercsi/ember-csi-operator:latest'
 OPERATOR_DOCKERFILE='build/Dockerfile.multistage'
 OPERATOR_SOURCE=
 
-OPENSHIFT_VERSION='4.6'
+OPENSHIFT_VERSION='4.9'
 
 if [[ -z "${CONFIG}" ]]; then
   echo 'No config file defined in command line'
@@ -161,14 +161,28 @@ fi
 SET_TELEMETRY=0
 VM_KEY='id_rsa'
 
-if [[ "${OPENSHIFT_VERSION}" == '4.7' ]]; then
+if [[ "${OPENSHIFT_VERSION}" == '4.9' ]]; then
+  CRC_VERSION='1.37.0'
+  OPM_VERSION='4.9.10'
+  SET_TELEMETRY=1
+  VM_KEY='id_ecdsa'
+
+elif [[ "${OPENSHIFT_VERSION}" == '4.8' ]]; then
+  CRC_VERSION='1.33.1'
+  OPM_VERSION='4.8.12'
+  SET_TELEMETRY=1
+  VM_KEY='id_ecdsa'
+
+elif [[ "${OPENSHIFT_VERSION}" == '4.7' ]]; then
   CRC_VERSION='1.27.0'
   SET_TELEMETRY=1
   VM_KEY='id_ecdsa'
   OPM_VERSION='4.7.11'
+
 elif [[ "${OPENSHIFT_VERSION}" == '4.6' ]]; then
   CRC_VERSION='1.20.0'
   OPM_VERSION='4.6.17'
+
 else
   echo "${RED}Unknown OPENSHIFT_VERSION: ${OPENSHIFT_VERSION}${NC}"
   exit 4

@@ -146,8 +146,10 @@ exec &> >(tee -a "${ARTIFACTS_DIR}/execution.log")
 
 if [[ -n "$CATALOG_SOURCE" || -n "$INDEX_SOURCE" ]]; then
   MARKETPLACE_CATALOG=custom
+  SUBSCRIPTION_NAME="${subscription_names[redhat]}"
 else
   MARKETPLACE_CATALOG=$CATALOG
+  SUBSCRIPTION_NAME="${subscription_names[$CATALOG]}"
 fi
 
 if [[ -n "${CATALOG_SOURCE}" && -n "${INDEX_SOURCE}" ]]; then
@@ -188,7 +190,6 @@ CRC="${CRC_DIR}/crc"
 
 CLEAN_OPTIONS='tar vm crc artifacts operator operator-container driver container container-catalog-source catalog-source registries e2e'
 DEFAULT_CLEAN_OPTIONS=('tar vm artifacts operator-container container')
-
 
 if [[ -n $DEBUG ]]; then
   set -x
@@ -605,7 +606,6 @@ function install_operator {
 
   echo "Subscribing (installing) the operator"
   oc apply -f "$manifests/operatorgroup.yaml"
-  SUBSCRIPTION_NAME="${subscription_names[$CATALOG]}"
   sed -e "s/subscription_name/${SUBSCRIPTION_NAME}/g" -e "s/marketplace_catalog/${MARKETPLACE_CATALOG}/g" "$manifests/subscription.yaml" | oc apply -f -
 
   if [[ -n "${OPERATOR_SOURCE}" ]]; then
@@ -617,18 +617,20 @@ function install_operator {
 
     container_location=$(get_container_location "$OPERATOR_REGISTRY" "$OPERATOR_CONTAINER")
 
+    csv_label="operators.coreos.com/${SUBSCRIPTION_NAME}.default"
+
     echo -n 'Waiting for the CSV to be present'
-    while [[ -z `oc get csv -l operators.coreos.com/ember-csi-operator.default -o=jsonpath='{.items...metadata.name}'` ]]; do
+    while [[ -z `oc get csv -l $csv_label -o=jsonpath='{.items...metadata.name}'` ]]; do
       echo -n '.'
       sleep 5
     done
 
-    csv_operator_image=`oc get csv -l operators.coreos.com/ember-csi-operator.default -o=jsonpath='{.items...image}'|head -n1`
+    csv_operator_image=`oc get csv -l $csv_label -o=jsonpath='{.items...image}'|head -n1`
     if [[ "${csv_operator_image}" != "${container_location}" ]]; then
       echo -e "\nCSV operator image does not match ${container_location}"
 
       # Locate the CSV name, since it's version dependent, for patching
-      csv_name=`oc get csv -l operators.coreos.com/ember-csi-operator.default -o=jsonpath='{.items...metadata.name}'|head -n1`
+      csv_name=`oc get csv -l $csv_label -o=jsonpath='{.items...metadata.name}'|head -n1`
       echo "Replacing CSV ${csv_name} operator image ..."
       file_path="$manifests/csv-operator-image.json"
       # Patching a deployment modifies the whole deployment, so we need to get
@@ -945,6 +947,7 @@ function clean_crc {
         sudo podman rm -f registry || true
         clean_container "${CATALOG_SOURCE}" "$CATALOG_CONTAINER_REPO" "$CATALOG_CONTAINER_NAME"
         clean_container "${INDEX_SOURCE}" "$INDEX_CONTAINER_REPO" "$INDEX_CONTAINER_NAME"
+        oc delete -n openshift-marketplace CatalogSource custom-operators
         ;;
       catalog-source)
          oc delete -f "$manifests/catalogsource.yaml" || true

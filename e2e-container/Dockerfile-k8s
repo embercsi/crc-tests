@@ -1,0 +1,13 @@
+FROM centos:7 AS builder
+ARG VERSION=1.22.3
+RUN useradd -u 1000 vagrant && \
+    cd /home/vagrant && \
+    curl -o e2e.tar.gz --location https://dl.k8s.io/v${VERSION}/kubernetes-test-linux-amd64.tar.gz && \
+    tar --strip-components=3 -zxf e2e.tar.gz kubernetes/test/bin/e2e.test kubernetes/test/bin/ginkgo && \
+    chown vagrant:vagrant e2e.test ginkgo && \
+    rm e2e.tar.gz
+
+COPY run-k8s.sh /home/vagrant/run-k8s.sh
+
+WORKDIR /home/vagrant
+ENTRYPOINT [ "./run-k8s.sh" ]

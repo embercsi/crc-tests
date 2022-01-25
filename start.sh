@@ -164,6 +164,7 @@ VM_KEY='id_rsa'
 if [[ "${OPENSHIFT_VERSION}" == '4.9' ]]; then
   CRC_VERSION='1.37.0'
   OPM_VERSION='4.9.10'
+  K8S_VERSION='1.22.3'
   SET_TELEMETRY=1
   VM_KEY='id_ecdsa'
 
@@ -197,6 +198,7 @@ INDEX_CONTAINER_REPO='quay.io'
 INDEX_CONTAINER_NAME='embercsi/embercsi-index:latest'
 
 E2E_CONTAINER="embercsi/openshift-tests:${OPENSHIFT_VERSION}"
+E2E_K8S_CONTAINER="embercsi/k8s-tests:${OPENSHIFT_VERSION}"
 
 CRC_URL=https://mirror.openshift.com/pub/openshift-v4/clients/crc/${CRC_VERSION}/crc-linux-amd64.tar.xz
 CRC_TEMP_FILE="${ARTIFACTS_DIR}/crc.tar.xz"
@@ -718,8 +720,12 @@ function deploy_driver {
 # E2E
 # =============================================================================
 
-function run_e2e_tests {
-  deploy_driver
+function _run_e2e {
+  container_name=$1
+  log_name=$2
+
+  login
+  oc config view --raw > "${ARTIFACTS_DIR}/kubeconfig.yaml"
 
   test_manifests="$MANIFEST_DIR/tests"
 
@@ -728,22 +734,6 @@ function run_e2e_tests {
     rm -f "${ARTIFACTS_DIR}/oc"
     cp "$oc_realpath" "${ARTIFACTS_DIR}/oc"
   fi
-
-  # Due to golang's pauper regex library we cannot use --run to limit the tests
-  # we run using regex negative lookahead.  So we do it in Python inside the
-  # container.
-  oc_path=`realpath "${OC_PATH}"`
-
-  if ! sudo podman image exists ${E2E_CONTAINER}; then
-    if ! sudo podman pull "${E2E_CONTAINER}"; then
-      echo "Could not pull container ${E2E_CONTAINER}, building it"
-      (cd "${SCRIPT_DIR}/e2e-container" && sudo ./build.sh $OPENSHIFT_VERSION)
-      login
-    fi
-  fi
-
-  login
-  oc config view --raw > "${ARTIFACTS_DIR}/kubeconfig.yaml"
 
   set +e
   sudo podman run --rm -it --name=e2e --network=host \
@@ -755,14 +745,40 @@ function run_e2e_tests {
           -e KUBECONFIG=/artifacts/kubeconfig.yaml \
           -e TEST_CSI_DRIVER_FILES=/home/vagrant/csi-test-config.yaml \
           -u root \
-          ${E2E_CONTAINER} ${ACTION_PARAMS[@]} 2>&1 | tee "${ARTIFACTS_DIR}/test-run.log"
+          ${container_name} ${ACTION_PARAMS[@]} 2>&1 | tee "${ARTIFACTS_DIR}/${log_name}"
   result=$?
   set -e
 
   save_logs
 
   exit $result
+}
 
+function run_e2e_tests {
+  deploy_driver
+
+  if ! sudo podman image exists ${E2E_CONTAINER}; then
+    if ! sudo podman pull "${E2E_CONTAINER}"; then
+      echo "Could not pull container ${E2E_CONTAINER}, building it"
+      (cd "${SCRIPT_DIR}/e2e-container" && sudo ./build.sh $OPENSHIFT_VERSION)
+      login
+    fi
+  fi
+
+  _run_e2e ${E2E_CONTAINER} test-e2e.log
+}
+
+function run_e2e_k8s_tests {
+  deploy_driver
+
+  if ! sudo podman image exists ${E2E_K8S_CONTAINER}; then
+    if ! sudo podman pull "${E2E_K8S_CONTAINER}"; then
+      echo "Could not pull container ${E2E_K8S_CONTAINER}, building it"
+      (cd "${SCRIPT_DIR}/e2e-container" && sudo podman build --build-arg VERSION=${K8S_VERSION} -f Dockerfile-k8s -t ${E2E_K8S_CONTAINER} .)
+    fi
+  fi
+
+  _run_e2e ${E2E_K8S_CONTAINER} test-e2e-k8s.log
 }
 
 
@@ -771,7 +787,7 @@ function run_e2e_tests {
 # =============================================================================
 
 function show_help {
-        echo -e "\nEmber-CSI simple test tool on OpenShift:\n$1 <action> [<config-file>] [<action-options>]\n\n<action>:\n  download: downloads the CRC files\n  setup: setup CRC dependencies\n  run: starts the CRC VM running OpenShift\n  catalog-source: make the container for the catalog source, be it from an index or from an operator bundle and upload to the OpenShift cluster.\n  operator: installs the Ember-CSI operator from a catalog (defaults to the community)\n  container: build/download the custom driver container and upload to the cluster.\n  driver: deploys an Ember-CSI driver (defaults to lvmdriver.yaml)\n  sanity: runs csi-sanity tests\n  e2e: runs end-to-end tests. Optional parameters: num-test-runs (defaults 1) concurrency (defatuls 0)\n  stop: Stops the CRC VM\n  ssh: SSHs into the CRC VM for debugging purposes\n  scp_to: SCP files into the CRC VM\n  login: Log in the OpenShift cluster\n  csc <config-file> -e <socket-file> <csc-command>. Ejemplo: -e /controller.sock controller list-volumes\n  clean [<config-file> <what>]: Cleans different aspects of the test deployment.  Defaults to everything except the crc installation. We can limit what to clean if we provide a configuration file (it can be '') and then what we want to clean as a series of parameters. Passing \"$0 clean '' all\" is equivalent to: \"$0 '' clean $CLEAN_OPTIONS\".\n\n<config-file>: Configuration file, which defaults to "config" in the current directory (check the "sample_config" file for available options).\n\n<socket-file>: /controller.sock  or /node.sock \n\nEvery action will ensure required steps will have been completed.\nFor example, if we run the operator action it will ensure downloads, setup, and run have been completed."
+        echo -e "\nEmber-CSI simple test tool on OpenShift:\n$1 <action> [<config-file>] [<action-options>]\n\n<action>:\n  download: downloads the CRC files\n  setup: setup CRC dependencies\n  run: starts the CRC VM running OpenShift\n  catalog-source: make the container for the catalog source, be it from an index or from an operator bundle and upload to the OpenShift cluster.\n  operator: installs the Ember-CSI operator from a catalog (defaults to the community)\n  container: build/download the custom driver container and upload to the cluster.\n  driver: deploys an Ember-CSI driver (defaults to lvmdriver.yaml)\n  sanity: runs csi-sanity tests\n  e2e: runs end-to-end tests. Optional parameters: num-test-runs (defaults 1) concurrency (defatuls 0)\n  e2e-k8s: runs end-to-end k8s tests\n  stop: Stops the CRC VM\n  ssh: SSHs into the CRC VM for debugging purposes\n  scp_to: SCP files into the CRC VM\n  login: Log in the OpenShift cluster\n  csc <config-file> -e <socket-file> <csc-command>. Ejemplo: -e /controller.sock controller list-volumes\n  clean [<config-file> <what>]: Cleans different aspects of the test deployment.  Defaults to everything except the crc installation. We can limit what to clean if we provide a configuration file (it can be '') and then what we want to clean as a series of parameters. Passing \"$0 clean '' all\" is equivalent to: \"$0 '' clean $CLEAN_OPTIONS\".\n\n<config-file>: Configuration file, which defaults to "config" in the current directory (check the "sample_config" file for available options).\n\n<socket-file>: /controller.sock  or /node.sock \n\nEvery action will ensure required steps will have been completed.\nFor example, if we run the operator action it will ensure downloads, setup, and run have been completed."
 }
 
 
@@ -1006,6 +1022,7 @@ function clean_crc {
         ;;
       e2e)
         sudo podman rmi ${E2E_CONTAINER} || true
+        sudo podman rmi ${E2E_K8S_CONTAINER} || true
         ;;
       *)
         echo "Unkown cleanable element ${element}"
@@ -1054,6 +1071,10 @@ case $COMMAND in
 
   e2e)
     run_e2e_tests
+    ;;
+
+  e2e-k8s)
+    run_e2e_k8s_tests
     ;;
 
   stop)

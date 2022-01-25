@@ -388,9 +388,7 @@ function run_crc {
 
   # For some reason the VM's iscsid fails to start on boot on CRC 1.17
   # CRC 1.20 doesn't have the initiatorname in the system
-  do_ssh 'if [[ ! -e /etc/iscsi/initiatorname.iscsi ]]; then echo InitiatorName=`iscsi-iname` | sudo tee /etc/iscsi/initiatorname.iscsi; fi'
-
-  do_ssh 'sudo systemctl restart iscsid'
+  do_ssh 'if [[ ! -e /etc/iscsi/initiatorname.iscsi ]]; then echo InitiatorName=`iscsi-iname` | sudo tee /etc/iscsi/initiatorname.iscsi; sudo systemctl restart iscsid; fi'
 
   # Multipath doesn't have a configuration, so we need to create it
   do_ssh 'if [[ ! -e /etc/multipath.conf ]]; then sudo mpathconf --enable --with_multipathd y --user_friendly_names n --find_multipaths y && sudo systemctl start multipathd; fi'
